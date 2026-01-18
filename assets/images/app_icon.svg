@@ -1,0 +1,15 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景渐变 -->
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4A90E2;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#50E3C2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 主圆形背景 -->
+  <circle cx="512" cy="512" r="512" fill="url(#bgGradient)" />
+  
+  <!-- Font Awesome Book Open图标路径 -->
+  <path d="M880 184H712v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H384v-64c0-4.4-3.6-8-8-8h-56c-4.4 0-8 3.6-8 8v64H144c-17.7 0-32 14.3-32 32v664c0 17.7 14.3 32 32 32h736c17.7 0 32-14.3 32-32V216c0-17.7-14.3-32-32-32zM648 744H376c-4.4 0-8-3.6-8-8v-56c0-4.4 3.6-8 8-8h272c4.4 0 8 3.6 8 8v56c0 4.4-3.6 8-8 8zm152-120H224V288h576v336zm0-400H224v-48h576v48z" fill="white" />
+</svg>

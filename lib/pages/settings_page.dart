@@ -1,0 +1,637 @@
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习数据图表
+import 'package:provider/provider.dart'; // 状态管理库，用于主题切换
+import '../models/study_progress.dart'; // 学习进度模型
+import '../providers/theme_provider.dart'; // 主题状态管理
+
+/// 设置页面
+///
+/// 包含以下功能模块：
+/// - 学习目标设置（每天学习单词数）
+/// - 界面设置（主题模式）
+/// - 学习设置（自动播放发音、默认显示例句）
+/// - 学习统计数据
+/// - 学习数据分析（饼图和柱状图）
+class SettingsPage extends StatefulWidget {
+  /// 创建页面状态对象
+  @override
+  _SettingsPageState createState() => _SettingsPageState();
+}
+
+/// SettingsPage 的状态管理类
+class _SettingsPageState extends State<SettingsPage> {
+  /// 学习进度对象，用于存储和显示学习数据
+  late StudyProgress _progress;
+
+  /// 每天学习目标单词数
+  int _dailyGoal = 20;
+
+  /// 主题模式（浅色、深色或跟随系统）
+  late ThemeMode _themeMode;
+
+  /// 是否自动播放单词发音
+  bool _autoPlayPronunciation = true;
+
+  /// 是否默认显示例句
+  bool _showExampleByDefault = false;
+
+  /// 数据加载状态
+  bool _isLoading = true;
+
+  /// 页面初始化时调用
+  @override
+  void initState() {
+    super.initState();
+    // 初始化数据：加载学习进度和设置
+    _loadData();
+  }
+
+  /// 当依赖的Provider发生变化时调用
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 从Provider获取当前主题模式
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    setState(() {
+      _themeMode = themeProvider.themeMode;
+    });
+  }
+
+  /// 加载设置数据
+  ///
+  /// 从本地存储加载学习进度和设置信息
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true; // 开始加载，显示加载指示器
+    });
+
+    // 加载学习进度数据
+    _progress = await StudyProgress.load();
+    _dailyGoal = _progress.dailyGoal; // 设置每天学习目标
+
+    setState(() {
+      _isLoading = false; // 加载完成，隐藏加载指示器
+    });
+  }
+
+  /// 更新每天学习目标
+  ///
+  /// 参数：
+  /// - value: 新的每天学习目标单词数
+  void _updateDailyGoal(double value) {
+    setState(() {
+      _dailyGoal = value.toInt(); // 更新目标值
+    });
+  }
+
+  /// 保存设置
+  ///
+  /// 将当前设置保存到本地存储
+  void _saveSettings() {
+    _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日目标
+    _progress.save(); // 保存到本地存储
+
+    // 显示保存成功提示
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('设置已保存'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  /// 切换主题模式
+  ///
+  /// 参数：
+  /// - mode: 新的主题模式
+  void _toggleThemeMode(ThemeMode mode) {
+    setState(() {
+      _themeMode = mode; // 更新本地状态
+    });
+
+    // 调用Provider更新全局主题
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    themeProvider.updateTheme(mode);
+  }
+
+  /// 切换自动播放发音设置
+  ///
+  /// 参数：
+  /// - value: 是否自动播放发音
+  void _toggleAutoPlayPronunciation(bool value) {
+    setState(() {
+      _autoPlayPronunciation = value;
+    });
+  }
+
+  /// 切换默认显示例句设置
+  ///
+  /// 参数：
+  /// - value: 是否默认显示例句
+  void _toggleShowExampleByDefault(bool value) {
+    setState(() {
+      _showExampleByDefault = value;
+    });
+  }
+
+  /// 构建页面UI
+  @override
+  Widget build(BuildContext context) {
+    // 加载状态下显示加载指示器
+    if (_isLoading) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: Colors.blue)),
+      );
+    }
+
+    // 构建完整的设置页面
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Padding(
+        padding: const EdgeInsets.all(20.0), // 页面内边距
+        child: ListView(
+          // 可滚动列表，用于容纳所有设置项
+          children: [
+            // 学习目标设置
+            _buildSettingSection('学习目标', [
+              // 每天学习单词数设置
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 5,
+                ),
+                title: Text(
+                  '每天学习单词数',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                subtitle: Text(
+                  '$_dailyGoal个单词/天', // 显示当前目标值
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ),
+              // 滑动条，用于调整每天学习单词数
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Slider(
+                  value: _dailyGoal.toDouble(), // 当前值
+                  min: 5, // 最小值
+                  max: 100, // 最大值
+                  divisions: 19, // 刻度数
+                  label: '$_dailyGoal', // 滑动时显示的标签
+                  onChanged: _updateDailyGoal, // 滑动时的回调函数
+                  activeColor: Colors.blue, // 已选择部分颜色
+                  inactiveColor: Colors.grey.shade300, // 未选择部分颜色
+                  thumbColor: Colors.blue, // 滑块颜色
+                ),
+              ),
+            ]),
+
+            SizedBox(height: 25), // 垂直间距
+            // 界面设置
+            _buildSettingSection('界面设置', [
+              // 主题模式设置
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '主题模式',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                trailing: Container(
+                  // 下拉选择框容器
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButton<ThemeMode>(
+                    value: _themeMode, // 当前选中的主题模式
+                    onChanged: (mode) => _toggleThemeMode(mode!), // 选择变化时的回调
+                    items: ThemeMode.values.map((mode) {
+                      // 主题模式选项
+                      return DropdownMenuItem(
+                        value: mode,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            _getThemeModeText(mode), // 显示主题模式文本
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    underline: SizedBox(), // 移除下拉框下划线
+                    icon: Icon(
+                      // 下拉箭头
+                      Icons.arrow_drop_down,
+                      color: Colors.blue.shade700,
+                    ),
+                    dropdownColor: // 下拉菜单背景色
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.white,
+                    menuMaxHeight: 200, // 下拉菜单最大高度
+                    style: TextStyle(
+                      // 下拉菜单项样式
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                    borderRadius: BorderRadius.circular(15), // 下拉菜单圆角
+                  ),
+                ),
+              ),
+            ]),
+
+            SizedBox(height: 25), // 垂直间距
+            // 学习设置
+            _buildSettingSection('学习设置', [
+              // 自动播放发音开关
+              SwitchListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '自动播放发音',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                value: _autoPlayPronunciation, // 当前开关状态
+                onChanged: _toggleAutoPlayPronunciation, // 开关变化时的回调
+                activeThumbColor: Colors.blue, // 开关激活时的滑块颜色
+                inactiveThumbColor: Colors.grey.shade400, // 开关未激活时的滑块颜色
+              ),
+
+              // 默认显示例句开关
+              SwitchListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '默认显示例句',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                value: _showExampleByDefault, // 当前开关状态
+                onChanged: _toggleShowExampleByDefault, // 开关变化时的回调
+                activeThumbColor: Colors.blue, // 开关激活时的滑块颜色
+                inactiveThumbColor: Colors.grey.shade400, // 开关未激活时的滑块颜色
+              ),
+            ]),
+
+            SizedBox(height: 25), // 垂直间距
+            // 学习统计
+            _buildSettingSection('学习统计', [
+              _buildStatisticItem('总学习单词数', '${_progress.totalWordsStudied}'),
+              _buildStatisticItem('已掌握单词数', '${_progress.masteredWords}'),
+              _buildStatisticItem('连续学习天数', '${_progress.consecutiveDays}'),
+              _buildStatisticItem(
+                '总学习时长',
+                '${_formatStudyTime(_progress.totalStudyTime)}',
+              ),
+              _buildStatisticItem(
+                '今日学习单词数',
+                '${_progress.todayWordsStudied}/${_progress.dailyGoal}',
+              ),
+              _buildStatisticItem(
+                '今日学习时长',
+                '${_formatStudyTime(_progress.todayStudyTime)}',
+              ),
+            ]),
+
+            SizedBox(height: 25), // 垂直间距
+            // 学习数据分析
+            _buildSettingSection('学习数据分析', [
+              // 学习进度饼图
+              Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Text(
+                      '学习进度',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    SizedBox(
+                      height: 250,
+                      child: PieChart(
+                        // 饼图组件，用于显示已掌握和学习中单词的比例
+                        PieChartData(
+                          sections: [
+                            // 饼图的各个部分
+                            PieChartSectionData(
+                              color: Colors.blue, // 已掌握部分颜色
+                              value: _progress.masteredWords
+                                  .toDouble(), // 已掌握单词数
+                              title: '已掌握', // 部分标题
+                              radius: 60, // 部分半径
+                              titleStyle: TextStyle(
+                                // 标题样式
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            PieChartSectionData(
+                              color: Colors.grey.shade300, // 学习中部分颜色
+                              value: // 学习中单词数
+                                  (_progress.totalWordsStudied -
+                                          _progress.masteredWords)
+                                      .toDouble(),
+                              title: '学习中', // 部分标题
+                              radius: 60, // 部分半径
+                              titleStyle: TextStyle(
+                                // 标题样式
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                          sectionsSpace: 2, // 各部分之间的间距
+                          centerSpaceRadius: 80, // 中心空白区域半径
+                          pieTouchData: PieTouchData(enabled: true), // 启用触摸交互
+                          borderData: FlBorderData(show: false), // 不显示边框
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              SizedBox(height: 20), // 垂直间距
+              // 今日目标达成率
+              Container(
+                padding: EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Text(
+                      '今日目标达成率',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                    ),
+                    SizedBox(height: 20),
+                    SizedBox(
+                      height: 150,
+                      child: BarChart(
+                        // 柱状图组件，用于显示今日学习目标达成情况
+                        BarChartData(
+                          alignment: BarChartAlignment.spaceAround, // 柱子对齐方式
+                          barTouchData: BarTouchData(enabled: true), // 启用触摸交互
+                          titlesData: FlTitlesData(show: false), // 不显示坐标轴标题
+                          borderData: FlBorderData(show: false), // 不显示边框
+                          gridData: FlGridData(
+                            // 网格线配置
+                            show: true,
+                            horizontalInterval: 1,
+                            verticalInterval: 1,
+                          ),
+                          barGroups: [
+                            // 柱子组
+                            BarChartGroupData(
+                              x: 0, // 柱子x坐标
+                              barRods: [
+                                // 柱子列表
+                                BarChartRodData(
+                                  toY: _progress.todayWordsStudied
+                                      .toDouble(), // 柱子高度（今日已学单词数）
+                                  color: Colors.blue, // 柱子颜色
+                                  width: 80, // 柱子宽度
+                                  borderRadius: BorderRadius.circular(
+                                    40,
+                                  ), // 柱子圆角
+                                ),
+                              ],
+                            ),
+                          ],
+                          maxY: _progress.dailyGoal
+                              .toDouble(), // 图表最大高度（每日目标单词数）
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      // 计算并显示达成率
+                      '${((_progress.todayWordsStudied / _progress.dailyGoal) * 100).toInt()}% 达成目标',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ]),
+
+            SizedBox(height: 40), // 垂直间距
+            // 保存设置按钮
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 300), // 按钮最大宽度
+              child: GestureDetector(
+                onTap: _saveSettings, // 点击保存设置
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 300), // 动画持续时间
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 20), // 按钮内边距
+                  decoration: BoxDecoration(
+                    color: Colors.blue, // 按钮背景色
+                    borderRadius: BorderRadius.circular(30), // 按钮圆角
+                    boxShadow: [
+                      // 按钮阴影
+                      BoxShadow(
+                        color: Color.fromRGBO(0, 122, 255, 0.3),
+                        spreadRadius: 5,
+                        blurRadius: 15,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '保存设置',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(height: 20), // 底部间距
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建设置分组的辅助方法
+  ///
+  /// 参数：
+  /// - title: 分组标题
+  /// - children: 分组内的设置项
+  ///
+  /// 返回：构建好的设置分组Widget
+  Widget _buildSettingSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, // 左对齐
+      children: [
+        Padding(
+          padding: EdgeInsets.only(left: 15),
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+        ),
+        SizedBox(height: 15), // 标题与内容间距
+        Container(
+          decoration: BoxDecoration(
+            // 卡片背景色：根据主题模式调整
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.grey.shade800
+                : Colors.white,
+            borderRadius: BorderRadius.circular(20), // 卡片圆角
+            boxShadow: [
+              // 卡片阴影
+              BoxShadow(
+                color: Color.fromRGBO(128, 128, 128, 0.2),
+                spreadRadius: 5,
+                blurRadius: 15,
+                offset: Offset(0, 5),
+              ),
+            ],
+          ),
+          child: Column(children: children), // 分组内的设置项
+        ),
+      ],
+    );
+  }
+
+  /// 构建统计项的辅助方法
+  ///
+  /// 参数：
+  /// - label: 统计项标签
+  /// - value: 统计项数值
+  ///
+  /// 返回：构建好的统计项Widget
+  Widget _buildStatisticItem(String label, String value) {
+    return ListTile(
+      contentPadding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: Theme.of(context).textTheme.bodyLarge?.color,
+        ),
+      ),
+      trailing: Container(
+        // 数值显示容器
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          // 背景色：根据主题模式调整
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.blue.shade900.withOpacity(0.3)
+              : Colors.blue.shade50,
+          borderRadius: BorderRadius.circular(25), // 容器圆角
+        ),
+        child: Text(
+          value, // 统计数值
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            // 文字颜色：根据主题模式调整
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.blue.shade400
+                : Colors.blue.shade700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 获取主题模式的中文文本
+  ///
+  /// 参数：
+  /// - mode: 主题模式枚举值
+  ///
+  /// 返回：主题模式的中文描述
+  String _getThemeModeText(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return '浅色模式';
+      case ThemeMode.dark:
+        return '深色模式';
+      case ThemeMode.system:
+        return '跟随系统';
+    }
+  }
+
+  /// 格式化学习时长
+  ///
+  /// 将秒数转换为易读的格式：
+  /// - 超过1小时：显示小时和分钟
+  /// - 超过1分钟：显示分钟和秒
+  /// - 否则：显示秒
+  ///
+  /// 参数：
+  /// - seconds: 学习时长（秒）
+  ///
+  /// 返回：格式化后的学习时长字符串
+  String _formatStudyTime(int seconds) {
+    final hours = seconds ~/ 3600; // 小时数
+    final minutes = (seconds % 3600) ~/ 60; // 分钟数
+    final remainingSeconds = seconds % 60; // 剩余秒数
+
+    if (hours > 0) {
+      return '${hours}小时${minutes}分钟';
+    } else if (minutes > 0) {
+      return '${minutes}分钟${remainingSeconds}秒';
+    } else {
+      return '${remainingSeconds}秒';
+    }
+  }
+}

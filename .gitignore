@@ -1,0 +1,28 @@
+# Flutter相关
+flutter_*.png
+.metadata
+.DS_Store
+.dart_tool/
+.packages
+.pub/
+build/
+ios/Flutter/.last_build_id
+android/app/debug/
+android/app/profile/
+android/app/release/
+
+# IDE相关
+*.iml
+*.ipr
+*.iws
+.idea/
+.vscode/
+
+# 测试相关
+coverage/
+test_coverage/
+
+# 其他
+.env
+*.log
+*.local
