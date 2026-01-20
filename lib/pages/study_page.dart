@@ -19,7 +19,8 @@ class StudyPage extends StatefulWidget {
   _StudyPageState createState() => _StudyPageState();
 }
 
-class _StudyPageState extends State<StudyPage> {
+class _StudyPageState extends State<StudyPage>
+    with SingleTickerProviderStateMixin {
   // 单词数据
   late List<Word> _words;
   int _currentIndex = 0;
@@ -34,19 +35,28 @@ class _StudyPageState extends State<StudyPage> {
   // 释义选项
   List<String> _meaningOptions = [];
   int _selectedOption = -1;
+  int _correctAnswerIndex = 0;
 
-  // 模拟数据（实际应从单词数据中生成）
-  final List<String> _fakeMeanings = [
-    "adj. 好斗的，有侵略性的；进取的",
-    "vt. 加重，使恶化；激怒，使恼火",
-    "adj. 进步的；逐步发生的；进行式的",
-    "adj. 过分的，过多的",
-  ];
+  // 动画相关
+  late AnimationController _animationController;
+  late Animation<double> _heightAnimation;
+  bool _isAnimating = false;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+
+    // 初始化动画控制器
+    _animationController = AnimationController(
+      duration: Duration(milliseconds: 500),
+      vsync: this,
+    );
+
+    // 初始化高度动画
+    _heightAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
   }
 
   // 加载数据
@@ -87,9 +97,36 @@ class _StudyPageState extends State<StudyPage> {
 
   // 初始化释义选项
   void _initMeaningOptions() {
-    // 实际应用中，这里应该从单词数据中生成释义选项
+    // 从单词数据中生成释义选项
     // 包括正确释义和几个干扰项
-    _meaningOptions = List.from(_fakeMeanings);
+    _meaningOptions = [];
+
+    // 添加当前单词的正确释义
+    final currentWord = _words[_currentIndex];
+    _meaningOptions.add(currentWord.meaning);
+
+    // 从其他单词中添加干扰项
+    final otherWords = _words
+        .where((word) => word.id != currentWord.id)
+        .toList();
+
+    // 随机选择几个干扰项（最多3个）
+    final distractorCount = 3;
+    for (int i = 0; i < distractorCount && i < otherWords.length; i++) {
+      _meaningOptions.add(otherWords[i].meaning);
+    }
+
+    // 如果干扰项不足，添加一些默认干扰项
+    while (_meaningOptions.length < 4) {
+      _meaningOptions.add('adj. 示例释义');
+    }
+
+    // 随机打乱选项顺序
+    _meaningOptions.shuffle();
+
+    // 记录正确答案的索引
+    _correctAnswerIndex = _meaningOptions.indexOf(currentWord.meaning);
+
     _selectedOption = -1;
     _showAnswer = false;
     _isCorrect = false;
@@ -107,8 +144,11 @@ class _StudyPageState extends State<StudyPage> {
     setState(() {
       _selectedOption = index;
       _showAnswer = true;
-      _isCorrect = index == 0; // 假设第一个选项是正确的
+      _isCorrect = index == _correctAnswerIndex; // 使用正确答案索引判断
     });
+
+    // 启动动画，无论选择正确还是错误的答案
+    _startAnimation();
 
     // 更新单词学习状态
     if (_isCorrect) {
@@ -134,6 +174,7 @@ class _StudyPageState extends State<StudyPage> {
       setState(() {
         _currentIndex = _currentIndex + 1;
         _initMeaningOptions();
+        _isAnimating = false;
       });
 
       // 自动播放发音
@@ -331,7 +372,7 @@ class _StudyPageState extends State<StudyPage> {
 
                     // 进度指示器
                     Text(
-                      '${_currentIndex + 1}/5',
+                      '${_currentIndex + 1}/${_words.length}',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey.shade600,
@@ -347,86 +388,97 @@ class _StudyPageState extends State<StudyPage> {
                 ),
               ),
 
-              // 单词卡片
+              // 单词卡片和释义选项 - 可滚动区域
               Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // 单词和音标
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 40),
-                      child: Column(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // 单词卡片
+                      Column(
                         children: [
-                          // 单词
-                          GestureDetector(
-                            onTap: () => _speakWord(currentWord.word),
-                            child: Text(
-                              currentWord.word,
-                              style: TextStyle(
-                                fontSize: 48,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-
-                          SizedBox(height: 10),
-
-                          // 音标
-                          Text(
-                            currentWord.phonetic ?? '',
-                            style: TextStyle(
-                              fontSize: 20,
-                              color: Colors.grey.shade600,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-
-                          SizedBox(height: 10),
-
-                          // 发音按钮
-                          IconButton(
-                            icon: Icon(Icons.volume_up, size: 32),
-                            onPressed: () => _speakWord(currentWord.word),
-                            color: Colors.orange,
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: 40),
-
-                    // 释义选项
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 20),
-                      child: Column(
-                        children: [
-                          // 提示文字
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Padding(
-                              padding: EdgeInsets.only(left: 20, bottom: 15),
-                              child: Text(
-                                '先回想词义再选择，想不起来「看答案」',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey.shade600,
+                          // 单词和音标
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 40),
+                            child: Column(
+                              children: [
+                                // 单词
+                                GestureDetector(
+                                  onTap: () => _speakWord(currentWord.word),
+                                  child: Text(
+                                    currentWord.word,
+                                    style: TextStyle(
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black,
+                                    ),
+                                  ),
                                 ),
-                              ),
+
+                                SizedBox(height: 10),
+
+                                // 音标
+                                Text(
+                                  currentWord.phonetic ?? '',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    color: Colors.grey.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+
+                                SizedBox(height: 10),
+
+                                // 发音按钮
+                                IconButton(
+                                  icon: Icon(Icons.volume_up, size: 32),
+                                  onPressed: () => _speakWord(currentWord.word),
+                                  color: Colors.orange,
+                                ),
+
+                                SizedBox(height: 20),
+                              ],
                             ),
                           ),
 
-                          // 释义选项列表
-                          for (int i = 0; i < _meaningOptions.length; i++)
-                            _buildMeaningOption(i, _meaningOptions[i]),
+                          SizedBox(height: 40),
+
+                          // 释义选项
+                          Container(
+                            padding: EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              children: [
+                                // 提示文字
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(
+                                      left: 20,
+                                      bottom: 15,
+                                    ),
+                                    child: Text(
+                                      '先回想词义再选择，想不起来「看答案」',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey.shade600,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+
+                                // 释义选项列表
+                                for (int i = 0; i < _meaningOptions.length; i++)
+                                  _buildMeaningOption(i, _meaningOptions[i]),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
 
-              // 底部两个功能按钮
+              // 底部两个功能按钮 - 固定在屏幕下方
               Container(
                 padding: EdgeInsets.all(10),
                 child: Row(
@@ -538,7 +590,7 @@ class _StudyPageState extends State<StudyPage> {
   // 构建释义选项
   Widget _buildMeaningOption(int index, String meaning) {
     final isSelected = index == _selectedOption;
-    final isCorrect = index == 0;
+    final isCorrect = index == _correctAnswerIndex;
     final showResult = _showAnswer;
 
     Color bgColor = Colors.white;
@@ -558,66 +610,190 @@ class _StudyPageState extends State<StudyPage> {
       borderColor = Colors.blue;
     }
 
-    return GestureDetector(
-      onTap: () => _selectMeaning(index),
-      child: Container(
-        margin: EdgeInsets.only(bottom: 15),
-        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-        decoration: BoxDecoration(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: borderColor, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.1),
-              spreadRadius: 3,
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // 选项标记
-            Container(
-              width: 24,
-              height: 24,
-              margin: EdgeInsets.only(right: 15),
+    if (isCorrect && showResult && _isAnimating) {
+      return AnimatedBuilder(
+        animation: _heightAnimation,
+        builder: (context, child) {
+          return GestureDetector(
+            onTap: () => _selectMeaning(index),
+            child: Container(
+              margin: EdgeInsets.only(bottom: 15),
+              padding: EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 15 + (_heightAnimation.value * 25),
+              ),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: showResult && isCorrect
-                    ? Colors.green
-                    : showResult && isSelected
-                    ? Colors.red
-                    : isSelected
-                    ? Colors.blue
-                    : Colors.grey.shade300,
+                color: bgColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: borderColor, width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.grey.withOpacity(0.1),
+                    spreadRadius: 3,
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
               ),
-              child: showResult && isCorrect
-                  ? Icon(Icons.check, size: 16, color: Colors.white)
-                  : SizedBox(),
-            ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      // 选项标记
+                      Container(
+                        width: 24,
+                        height: 24,
+                        margin: EdgeInsets.only(right: 15),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: showResult && isCorrect
+                              ? Colors.green
+                              : showResult && isSelected
+                              ? Colors.red
+                              : isSelected
+                              ? Colors.blue
+                              : Colors.grey.shade300,
+                        ),
+                        child: showResult && isCorrect
+                            ? Icon(Icons.check, size: 16, color: Colors.white)
+                            : SizedBox(),
+                      ),
 
-            // 释义文本
-            Expanded(
-              child: Text(
-                meaning,
-                style: TextStyle(fontSize: 18, color: textColor),
+                      // 释义文本
+                      Expanded(
+                        child: Text(
+                          meaning,
+                          style: TextStyle(fontSize: 18, color: textColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // 例句显示区域
+                  if (isCorrect &&
+                      _heightAnimation.value > 0.3 &&
+                      _words[_currentIndex].example != null &&
+                      _words[_currentIndex].example!.isNotEmpty)
+                    Opacity(
+                      opacity: ((_heightAnimation.value - 0.3) * 1.67).clamp(
+                        0.0,
+                        1.0,
+                      ),
+                      child: Container(
+                        margin: EdgeInsets.only(top: 15),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 15,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              '例句',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.blue,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              _words[_currentIndex].example!,
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.black87,
+                                fontStyle: FontStyle.italic,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
-          ],
+          );
+        },
+      );
+    } else {
+      return GestureDetector(
+        onTap: () => _selectMeaning(index),
+        child: Container(
+          margin: EdgeInsets.only(bottom: 15),
+          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: borderColor, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                spreadRadius: 3,
+                blurRadius: 10,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              // 选项标记
+              Container(
+                width: 24,
+                height: 24,
+                margin: EdgeInsets.only(right: 15),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: showResult && isCorrect
+                      ? Colors.green
+                      : showResult && isSelected
+                      ? Colors.red
+                      : isSelected
+                      ? Colors.blue
+                      : Colors.grey.shade300,
+                ),
+                child: showResult && isCorrect
+                    ? Icon(Icons.check, size: 16, color: Colors.white)
+                    : SizedBox(),
+              ),
+
+              // 释义文本
+              Expanded(
+                child: Text(
+                  meaning,
+                  style: TextStyle(fontSize: 18, color: textColor),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    }
+  }
+
+  // 启动动画
+  void _startAnimation() {
+    _animationController.reset();
+    _animationController.forward();
+    setState(() {
+      _isAnimating = true;
+    });
   }
 
   // 显示正确答案
   void _showCorrectAnswer() {
     setState(() {
       _showAnswer = true;
-      _selectedOption = 0;
+      _selectedOption = _correctAnswerIndex;
       _isCorrect = true;
     });
+
+    // 启动动画
+    _startAnimation();
   }
 
   // 显示底部上拉菜单
@@ -786,5 +962,11 @@ class _StudyPageState extends State<StudyPage> {
     Future.delayed(Duration(seconds: 2), () {
       overlayEntry.remove();
     });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
   }
 }

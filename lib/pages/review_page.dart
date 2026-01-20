@@ -32,6 +32,11 @@ class _ReviewPageState extends State<ReviewPage> {
   // 当前选择的状态
   StudyStatus _selectedStatus = StudyStatus.learning;
 
+  // 例句显示相关
+  bool _showExample = false;
+  double _exampleOpacity = 0.0;
+  double _exampleScale = 0.8;
+
   @override
   void initState() {
     super.initState();
@@ -181,28 +186,65 @@ class _ReviewPageState extends State<ReviewPage> {
           ],
         ),
         actions: [
-          // 返回主页
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // 关闭对话框
-              // 判断是否可以返回（通过导航栈）
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context); // 返回上一页
-              } else {
-                // 如果无法返回，说明是在PageView中，什么都不做
-                // 继续留在当前页面
-              }
-            },
-            child: Text('返回'),
-          ),
-          // 继续复习
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // 关闭对话框
-              // 重新开始复习
-              _loadData();
-            },
-            child: Text('继续复习'),
+          // 使用Row和Expanded实现按钮对称分布
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // 返回主页
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 5),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.grey.shade100,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // 关闭对话框
+                      // 判断是否可以返回（通过导航栈）
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context); // 返回上一页
+                      } else {
+                        // 如果无法返回，说明是在PageView中，什么都不做
+                        // 继续留在当前页面
+                      }
+                    },
+                    child: Text(
+                      '返回',
+                      style: TextStyle(fontSize: 16, color: Colors.black),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 继续复习
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 5),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // 关闭对话框
+                      // 重新开始复习
+                      _loadData();
+                    },
+                    child: Text(
+                      '继续复习',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -321,6 +363,72 @@ class _ReviewPageState extends State<ReviewPage> {
                             onPressed: () => _speakWord(currentWord.word),
                             color: Colors.orange,
                           ),
+
+                          SizedBox(height: 20),
+
+                          // 例句显示区域
+                          if (currentWord.example != null &&
+                              currentWord.example!.isNotEmpty)
+                            GestureDetector(
+                              onTap: _toggleExample,
+                              child: AnimatedOpacity(
+                                opacity: _showExample ? _exampleOpacity : 0.0,
+                                duration: Duration(milliseconds: 300),
+                                child: AnimatedContainer(
+                                  duration: Duration(milliseconds: 300),
+                                  transform: Matrix4.identity()
+                                    ..scale(_showExample ? _exampleScale : 0.8),
+                                  padding: EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 15,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(15),
+                                    border: Border.all(
+                                      color: Colors.green.shade200,
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        '例句',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Colors.green.shade600,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      SizedBox(height: 8),
+                                      Text(
+                                        currentWord.example!,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.green.shade800,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // 显示/隐藏例句按钮
+                          if (currentWord.example != null &&
+                              currentWord.example!.isNotEmpty)
+                            TextButton(
+                              onPressed: _toggleExample,
+                              child: Text(
+                                _showExample ? '隐藏例句' : '显示例句',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.green,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),
@@ -640,5 +748,40 @@ class _ReviewPageState extends State<ReviewPage> {
         ],
       ),
     );
+  }
+
+  // 切换例句显示状态
+  void _toggleExample() {
+    setState(() {
+      _showExample = !_showExample;
+
+      if (_showExample) {
+        // 显示例句动画
+        Future.delayed(Duration.zero, () {
+          setState(() {
+            _exampleOpacity = 0.0;
+            _exampleScale = 0.8;
+          });
+
+          Future.delayed(Duration(milliseconds: 50), () {
+            setState(() {
+              _exampleOpacity = 1.0;
+              _exampleScale = 1.0;
+            });
+          });
+        });
+      } else {
+        // 隐藏例句动画
+        setState(() {
+          _exampleOpacity = 0.0;
+          _exampleScale = 0.8;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
   }
 }
