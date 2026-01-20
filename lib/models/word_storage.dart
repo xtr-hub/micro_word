@@ -114,6 +114,44 @@ class WordStorage {
     }
   }
 
+  /// 重置单词数据为默认的50个单词
+  ///
+  /// 功能：
+  /// - 删除现有的单词数据文件
+  /// - 保存新的50个默认单词到存储中
+  /// - 用于强制更新为最新的默认单词列表
+  ///
+  /// 返回值：
+  /// - Future<List<Word>>：异步操作，返回重置后的单词列表
+  static Future<List<Word>> resetToDefaultWords() async {
+    try {
+      /// 获取应用程序文档目录
+      final directory = await getApplicationDocumentsDirectory();
+
+      /// 创建单词数据文件
+      final file = File('${directory.path}/$_fileName');
+
+      /// 删除现有文件（如果存在）
+      if (file.existsSync()) {
+        await file.delete();
+        print('已删除现有数据文件');
+      }
+
+      /// 获取新的默认单词列表
+      final defaultWords = _getDefaultWords();
+
+      /// 保存到文件
+      await saveWords(defaultWords);
+
+      print('已重置为新的50个默认单词');
+      return defaultWords;
+    } catch (e) {
+      /// 如果重置失败，打印错误信息
+      print('重置单词数据失败: $e');
+      return _getDefaultWords();
+    }
+  }
+
   /// 获取默认单词列表
   ///
   /// 功能：

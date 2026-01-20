@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习数据
 import 'package:provider/provider.dart'; // 状态管理库，用于主题切换
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
+import '../models/word_storage.dart'; // 单词存储服务
 import '../providers/theme_provider.dart'; // 主题状态管理
 
 /// 设置页面
@@ -124,6 +125,68 @@ class _SettingsPageState extends State<SettingsPage> {
     // 显示保存成功提示
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('设置已保存'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  /// 重置为默认单词
+  ///
+  /// 将当前单词数据重置为50个默认单词
+  void _resetToDefaultWords() async {
+    // 显示确认对话框
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text('确认重置'),
+          content: Text('确定要将所有单词数据重置为50个默认单词吗？此操作不可撤销！'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(); // 关闭对话框
+              },
+            ),
+            TextButton(
+              child: Text('重置'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red, // 重置按钮文字颜色
+              ),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // 关闭对话框
+
+                try {
+                  // 保存当前上下文用于异步操作
+                  final scaffoldContext = ScaffoldMessenger.of(context).context;
+
+                  // 调用WordStorage的重置方法
+                  await WordStorage.resetToDefaultWords();
+
+                  // 显示重置成功提示
+                  ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                    SnackBar(
+                      content: Text('已成功重置为50个默认单词'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  // 保存当前上下文用于异步操作
+                  final scaffoldContext = ScaffoldMessenger.of(context).context;
+
+                  // 显示重置失败提示
+                  ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                    SnackBar(
+                      content: Text('重置失败：$e'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -616,6 +679,43 @@ class _SettingsPageState extends State<SettingsPage> {
             ]),
 
             SizedBox(height: 40), // 垂直间距
+            // 重置为默认单词按钮
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 300), // 按钮最大宽度
+              child: GestureDetector(
+                onTap: _resetToDefaultWords, // 点击重置为默认单词
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 300), // 动画持续时间
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 20), // 按钮内边距
+                  decoration: BoxDecoration(
+                    color: Colors.red, // 按钮背景色
+                    borderRadius: BorderRadius.circular(30), // 按钮圆角
+                    boxShadow: [
+                      // 按钮阴影
+                      BoxShadow(
+                        color: Color.fromRGBO(255, 0, 0, 0.3),
+                        spreadRadius: 5,
+                        blurRadius: 15,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '重置为50个默认单词',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(height: 20), // 垂直间距
             // 保存设置按钮
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 300), // 按钮最大宽度
