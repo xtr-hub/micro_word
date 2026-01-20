@@ -118,13 +118,14 @@ class WordStorage {
   ///
   /// 功能：
   /// - 当没有保存的单词数据时，返回这个默认列表
-  /// - 包含10个常用英文单词，用于演示和首次使用
+  /// - 包含50个常用英文单词，用于演示和首次使用
   ///
   /// 返回值：
-  /// - List<Word>：包含10个默认单词的列表
+  /// - List<Word>：包含50个默认单词的列表
   static List<Word> _getDefaultWords() {
-    /// 返回一个包含10个默认单词的列表
+    /// 返回一个包含50个默认单词的列表
     return [
+      // A
       Word(
         id: 1,
         word: 'apple',
@@ -135,6 +136,40 @@ class WordStorage {
       ),
       Word(
         id: 2,
+        word: 'ant',
+        meaning: '蚂蚁',
+        phonetic: '/ænt/',
+        example: 'The ant is carrying a piece of food.',
+        exampleMeaning: '蚂蚁正在搬运一块食物。',
+      ),
+      Word(
+        id: 3,
+        word: 'air',
+        meaning: '空气',
+        phonetic: '/er/',
+        example: 'We need clean air to breathe.',
+        exampleMeaning: '我们需要清洁的空气来呼吸。',
+      ),
+      Word(
+        id: 4,
+        word: 'art',
+        meaning: '艺术',
+        phonetic: '/ɑːrt/',
+        example: 'She studies art at university.',
+        exampleMeaning: '她在大学学习艺术。',
+      ),
+      Word(
+        id: 5,
+        word: 'animal',
+        meaning: '动物',
+        phonetic: '/ˈænɪml/',
+        example: 'There are many animals in the zoo.',
+        exampleMeaning: '动物园里有很多动物。',
+      ),
+
+      // B
+      Word(
+        id: 6,
         word: 'banana',
         meaning: '香蕉',
         phonetic: '/bəˈnɑːnə/',
@@ -142,7 +177,41 @@ class WordStorage {
         exampleMeaning: '香蕉富含钾元素。',
       ),
       Word(
-        id: 3,
+        id: 7,
+        word: 'book',
+        meaning: '书',
+        phonetic: '/bʊk/',
+        example: 'I read a book every night.',
+        exampleMeaning: '我每天晚上读一本书。',
+      ),
+      Word(
+        id: 8,
+        word: 'bird',
+        meaning: '鸟',
+        phonetic: '/bɜːrd/',
+        example: 'The bird is singing in the tree.',
+        exampleMeaning: '鸟在树上唱歌。',
+      ),
+      Word(
+        id: 9,
+        word: 'blue',
+        meaning: '蓝色的',
+        phonetic: '/bluː/',
+        example: 'The sky is blue today.',
+        exampleMeaning: '今天的天空是蓝色的。',
+      ),
+      Word(
+        id: 10,
+        word: 'box',
+        meaning: '盒子',
+        phonetic: '/bɑːks/',
+        example: 'Put the toys in the box.',
+        exampleMeaning: '把玩具放进盒子里。',
+      ),
+
+      // C
+      Word(
+        id: 11,
         word: 'cherry',
         meaning: '樱桃',
         phonetic: '/ˈtʃeri/',
@@ -150,7 +219,41 @@ class WordStorage {
         exampleMeaning: '樱桃现在成熟了。',
       ),
       Word(
-        id: 4,
+        id: 12,
+        word: 'cat',
+        meaning: '猫',
+        phonetic: '/kæt/',
+        example: 'The cat is sleeping on the sofa.',
+        exampleMeaning: '猫正在沙发上睡觉。',
+      ),
+      Word(
+        id: 13,
+        word: 'car',
+        meaning: '汽车',
+        phonetic: '/kɑːr/',
+        example: 'My father drives a red car.',
+        exampleMeaning: '我爸爸开一辆红色的汽车。',
+      ),
+      Word(
+        id: 14,
+        word: 'cake',
+        meaning: '蛋糕',
+        phonetic: '/keɪk/',
+        example: 'We ate cake at the party.',
+        exampleMeaning: '我们在派对上吃了蛋糕。',
+      ),
+      Word(
+        id: 15,
+        word: 'city',
+        meaning: '城市',
+        phonetic: '/ˈsɪti/',
+        example: 'I live in a big city.',
+        exampleMeaning: '我住在一个大城市里。',
+      ),
+
+      // D
+      Word(
+        id: 16,
         word: 'date',
         meaning: '日期；枣',
         phonetic: '/deɪt/',
@@ -158,7 +261,41 @@ class WordStorage {
         exampleMeaning: '今天是几号？',
       ),
       Word(
-        id: 5,
+        id: 17,
+        word: 'dog',
+        meaning: '狗',
+        phonetic: '/dɔːɡ/',
+        example: 'The dog is barking at the stranger.',
+        exampleMeaning: '狗正在对着陌生人叫。',
+      ),
+      Word(
+        id: 18,
+        word: 'door',
+        meaning: '门',
+        phonetic: '/dɔːr/',
+        example: 'Please close the door.',
+        exampleMeaning: '请把门关上。',
+      ),
+      Word(
+        id: 19,
+        word: 'duck',
+        meaning: '鸭子',
+        phonetic: '/dʌk/',
+        example: 'The duck is swimming in the pond.',
+        exampleMeaning: '鸭子在池塘里游泳。',
+      ),
+      Word(
+        id: 20,
+        word: 'desk',
+        meaning: '书桌',
+        phonetic: '/desk/',
+        example: 'I do my homework on the desk.',
+        exampleMeaning: '我在书桌上做作业。',
+      ),
+
+      // E
+      Word(
+        id: 21,
         word: 'elephant',
         meaning: '大象',
         phonetic: '/ˈelɪfənt/',
@@ -166,7 +303,41 @@ class WordStorage {
         exampleMeaning: '大象是最大的陆地动物。',
       ),
       Word(
-        id: 6,
+        id: 22,
+        word: 'egg',
+        meaning: '鸡蛋',
+        phonetic: '/eɡ/',
+        example: 'I eat an egg for breakfast.',
+        exampleMeaning: '我早餐吃一个鸡蛋。',
+      ),
+      Word(
+        id: 23,
+        word: 'eye',
+        meaning: '眼睛',
+        phonetic: '/aɪ/',
+        example: 'He has blue eyes.',
+        exampleMeaning: '他有蓝色的眼睛。',
+      ),
+      Word(
+        id: 24,
+        word: 'ear',
+        meaning: '耳朵',
+        phonetic: '/ɪr/',
+        example: 'She has big ears.',
+        exampleMeaning: '她有大耳朵。',
+      ),
+      Word(
+        id: 25,
+        word: 'eat',
+        meaning: '吃',
+        phonetic: '/iːt/',
+        example: 'We eat dinner at 7 oclock.',
+        exampleMeaning: '我们7点吃晚饭。',
+      ),
+
+      // F
+      Word(
+        id: 26,
         word: 'friend',
         meaning: '朋友',
         phonetic: '/frend/',
@@ -174,7 +345,41 @@ class WordStorage {
         exampleMeaning: '他是我最好的朋友。',
       ),
       Word(
-        id: 7,
+        id: 27,
+        word: 'fish',
+        meaning: '鱼',
+        phonetic: '/fɪʃ/',
+        example: 'I like to eat fish.',
+        exampleMeaning: '我喜欢吃鱼。',
+      ),
+      Word(
+        id: 28,
+        word: 'flower',
+        meaning: '花',
+        phonetic: '/ˈflaʊər/',
+        example: 'The garden has many colorful flowers.',
+        exampleMeaning: '花园里有许多五颜六色的花。',
+      ),
+      Word(
+        id: 29,
+        word: 'food',
+        meaning: '食物',
+        phonetic: '/fuːd/',
+        example: 'We need food to live.',
+        exampleMeaning: '我们需要食物来生存。',
+      ),
+      Word(
+        id: 30,
+        word: 'fly',
+        meaning: '飞',
+        phonetic: '/flaɪ/',
+        example: 'Birds can fly in the sky.',
+        exampleMeaning: '鸟能在天空中飞翔。',
+      ),
+
+      // G
+      Word(
+        id: 31,
         word: 'guitar',
         meaning: '吉他',
         phonetic: '/ɡɪˈtɑːr/',
@@ -182,28 +387,166 @@ class WordStorage {
         exampleMeaning: '她吉他弹得非常好。',
       ),
       Word(
-        id: 8,
+        id: 32,
+        word: 'goat',
+        meaning: '山羊',
+        phonetic: '/ɡoʊt/',
+        example: 'The goat is eating grass.',
+        exampleMeaning: '山羊正在吃草。',
+      ),
+      Word(
+        id: 33,
+        word: 'green',
+        meaning: '绿色的',
+        phonetic: '/ɡriːn/',
+        example: 'The grass is green in spring.',
+        exampleMeaning: '春天的草是绿色的。',
+      ),
+      Word(
+        id: 34,
+        word: 'girl',
+        meaning: '女孩',
+        phonetic: '/ɡɜːrl/',
+        example: 'The little girl is playing with a doll.',
+        exampleMeaning: '小女孩正在玩洋娃娃。',
+      ),
+      Word(
+        id: 35,
+        word: 'glass',
+        meaning: '玻璃；玻璃杯',
+        phonetic: '/ɡlæs/',
+        example: 'Please give me a glass of water.',
+        exampleMeaning: '请给我一杯水。',
+      ),
+
+      // H
+      Word(
+        id: 36,
         word: 'happy',
         meaning: '快乐的',
         phonetic: '/ˈhæpi/',
-        example: 'I feel very happy today.',
-        exampleMeaning: '我今天感到非常开心。',
+        example: 'I feel happy today.',
+        exampleMeaning: '我今天感到很开心。',
       ),
       Word(
-        id: 9,
-        word: 'internet',
-        meaning: '互联网',
-        phonetic: '/ˈɪntərnet/',
-        example: 'I use the internet every day.',
-        exampleMeaning: '我每天使用互联网。',
+        id: 37,
+        word: 'house',
+        meaning: '房子',
+        phonetic: '/haʊs/',
+        example: 'We live in a big house.',
+        exampleMeaning: '我们住在一所大房子里。',
       ),
       Word(
-        id: 10,
-        word: 'jungle',
-        meaning: '丛林',
-        phonetic: '/ˈdʒʌŋɡl/',
-        example: 'Tigers live in the jungle.',
-        exampleMeaning: '老虎生活在丛林中。',
+        id: 38,
+        word: 'horse',
+        meaning: '马',
+        phonetic: '/hɔːrs/',
+        example: 'The horse can run very fast.',
+        exampleMeaning: '马能跑得很快。',
+      ),
+      Word(
+        id: 39,
+        word: 'hand',
+        meaning: '手',
+        phonetic: '/hænd/',
+        example: 'She has small hands.',
+        exampleMeaning: '她有一双小手。',
+      ),
+      Word(
+        id: 40,
+        word: 'hat',
+        meaning: '帽子',
+        phonetic: '/hæt/',
+        example: 'He is wearing a red hat.',
+        exampleMeaning: '他戴着一顶红色的帽子。',
+      ),
+
+      // I-J-K
+      Word(
+        id: 41,
+        word: 'ice',
+        meaning: '冰',
+        phonetic: '/aɪs/',
+        example: 'The ice is melting in the sun.',
+        exampleMeaning: '冰在阳光下融化。',
+      ),
+      Word(
+        id: 42,
+        word: 'jump',
+        meaning: '跳',
+        phonetic: '/dʒʌmp/',
+        example: 'The cat can jump very high.',
+        exampleMeaning: '这只猫能跳得很高。',
+      ),
+      Word(
+        id: 43,
+        word: 'king',
+        meaning: '国王',
+        phonetic: '/kɪŋ/',
+        example: 'The king lived in a castle.',
+        exampleMeaning: '国王住在城堡里。',
+      ),
+
+      // L-M-N
+      Word(
+        id: 44,
+        word: 'lion',
+        meaning: '狮子',
+        phonetic: '/ˈlaɪən/',
+        example: 'The lion is the king of the jungle.',
+        exampleMeaning: '狮子是丛林之王。',
+      ),
+      Word(
+        id: 45,
+        word: 'moon',
+        meaning: '月亮',
+        phonetic: '/muːn/',
+        example: 'The moon is bright tonight.',
+        exampleMeaning: '今晚的月亮很明亮。',
+      ),
+      Word(
+        id: 46,
+        word: 'nose',
+        meaning: '鼻子',
+        phonetic: '/noʊz/',
+        example: 'She has a small nose.',
+        exampleMeaning: '她有一个小鼻子。',
+      ),
+
+      // O-P-Q
+      Word(
+        id: 47,
+        word: 'orange',
+        meaning: '橙子；橙色的',
+        phonetic: '/ˈɔːrɪndʒ/',
+        example: 'I eat an orange every morning.',
+        exampleMeaning: '我每天早上吃一个橙子。',
+      ),
+      Word(
+        id: 48,
+        word: 'pencil',
+        meaning: '铅笔',
+        phonetic: '/ˈpensl/',
+        example: 'I write with a pencil.',
+        exampleMeaning: '我用铅笔写字。',
+      ),
+      Word(
+        id: 49,
+        word: 'queen',
+        meaning: '女王',
+        phonetic: '/kwiːn/',
+        example: 'The queen lives in a palace.',
+        exampleMeaning: '女王住在宫殿里。',
+      ),
+
+      // R-S-T
+      Word(
+        id: 50,
+        word: 'rabbit',
+        meaning: '兔子',
+        phonetic: '/ˈræbɪt/',
+        example: 'The rabbit has long ears.',
+        exampleMeaning: '兔子有长长的耳朵。',
       ),
     ];
   }

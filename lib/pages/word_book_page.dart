@@ -36,11 +36,11 @@ class _WordBookPageState extends State<WordBookPage> {
     setState(() {
       _isLoading = true;
     });
-    
+
     _words = await WordStorage.loadWords();
     _filteredWords = List.from(_words);
     _sortWords();
-    
+
     setState(() {
       _isLoading = false;
     });
@@ -57,18 +57,18 @@ class _WordBookPageState extends State<WordBookPage> {
   // 应用过滤条件
   void _applyFilters() {
     _filteredWords = _words.where((word) {
-      final matchesSearch = 
+      final matchesSearch =
           word.word.toLowerCase().contains(_searchKeyword.toLowerCase()) ||
           word.meaning.toLowerCase().contains(_searchKeyword.toLowerCase());
-      
-      final matchesStatus = _selectedStatusFilter == null ||
-          word.status == _selectedStatusFilter;
-      
+
+      final matchesStatus =
+          _selectedStatusFilter == null || word.status == _selectedStatusFilter;
+
       final matchesFavorite = !_showOnlyFavorites || word.isFavorite;
-      
+
       return matchesSearch && matchesStatus && matchesFavorite;
     }).toList();
-    
+
     _sortWords();
   }
 
@@ -79,10 +79,14 @@ class _WordBookPageState extends State<WordBookPage> {
         _filteredWords.sort((a, b) => a.word.compareTo(b.word));
         break;
       case SortOption.lastStudyTime:
-        _filteredWords.sort((a, b) => b.lastStudyTime.compareTo(a.lastStudyTime));
+        _filteredWords.sort(
+          (a, b) => b.lastStudyTime.compareTo(a.lastStudyTime),
+        );
         break;
       case SortOption.memoryStrength:
-        _filteredWords.sort((a, b) => b.memoryStrength.compareTo(a.memoryStrength));
+        _filteredWords.sort(
+          (a, b) => b.memoryStrength.compareTo(a.memoryStrength),
+        );
         break;
     }
   }
@@ -135,11 +139,19 @@ class _WordBookPageState extends State<WordBookPage> {
 
   // 编辑单词
   void _editWord(Word word) {
-    final TextEditingController wordController = TextEditingController(text: word.word);
-    final TextEditingController meaningController = TextEditingController(text: word.meaning);
-    final TextEditingController phoneticController = TextEditingController(text: word.phonetic);
-    final TextEditingController exampleController = TextEditingController(text: word.example);
-    
+    final TextEditingController wordController = TextEditingController(
+      text: word.word,
+    );
+    final TextEditingController meaningController = TextEditingController(
+      text: word.meaning,
+    );
+    final TextEditingController phoneticController = TextEditingController(
+      text: word.phonetic,
+    );
+    final TextEditingController exampleController = TextEditingController(
+      text: word.example,
+    );
+
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -189,11 +201,11 @@ class _WordBookPageState extends State<WordBookPage> {
                   memoryStrength: word.memoryStrength,
                   isFavorite: word.isFavorite,
                 );
-                
+
                 final index = _words.indexWhere((w) => w.id == word.id);
                 // 先关闭对话框，再执行异步操作
                 Navigator.pop(dialogContext);
-                
+
                 if (index != -1) {
                   _words[index] = updatedWord;
                   await WordStorage.saveWords(_words);
@@ -221,7 +233,7 @@ class _WordBookPageState extends State<WordBookPage> {
       memoryStrength: word.memoryStrength,
       isFavorite: !word.isFavorite,
     );
-    
+
     final index = _words.indexWhere((w) => w.id == word.id);
     if (index != -1) {
       _words[index] = updatedWord;
@@ -238,7 +250,7 @@ class _WordBookPageState extends State<WordBookPage> {
     final TextEditingController meaningController = TextEditingController();
     final TextEditingController phoneticController = TextEditingController();
     final TextEditingController exampleController = TextEditingController();
-    
+
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
@@ -285,10 +297,10 @@ class _WordBookPageState extends State<WordBookPage> {
                   example: exampleController.text.trim(),
                   isFavorite: false,
                 );
-                
+
                 // 先关闭对话框，再执行异步操作
                 Navigator.pop(dialogContext);
-                
+
                 await WordStorage.addWord(newWord);
                 _loadData();
               },
@@ -311,276 +323,352 @@ class _WordBookPageState extends State<WordBookPage> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Stack(
-      children: [
-        Column(
-          children: [
-            // 搜索栏
-            Padding(
-              padding: const EdgeInsets.all(15.0),
-              child: TextField(
-                onChanged: _searchWords,
-                decoration: InputDecoration(
-                  hintText: '搜索单词或释义',
-                  prefixIcon: Icon(Icons.search, color: Colors.blue.shade700),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(25),
-                    borderSide: BorderSide.none,
+        children: [
+          Column(
+            children: [
+              // 搜索栏
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: TextField(
+                  onChanged: _searchWords,
+                  decoration: InputDecoration(
+                    hintText: '搜索单词或释义',
+                    prefixIcon: Icon(Icons.search, color: Colors.blue.shade700),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Color.fromRGBO(255, 255, 255, 0.9),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 15,
+                    ),
+                    hintStyle: TextStyle(color: Colors.grey.shade400),
                   ),
-                  filled: true,
-                  fillColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Color.fromRGBO(255, 255, 255, 0.9),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                  hintStyle: TextStyle(color: Colors.grey.shade400),
-                ),
-                style: TextStyle(
-                  fontSize: 16,
-                  color: Theme.of(context).textTheme.bodyLarge?.color,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
                 ),
               ),
-            ),
-            
-            // 过滤和排序选项
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-              child: Wrap(
-                spacing: 15,
-                runSpacing: 15,
-                alignment: WrapAlignment.center,
-                children: [
-                  // 学习状态过滤
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Color.fromRGBO(255, 255, 255, 0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color.fromRGBO(128, 128, 128, 0.2),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: DropdownButton<StudyStatus?>(
-                        value: _selectedStatusFilter,
-                        hint: Text('所有状态', style: TextStyle(color: Colors.grey.shade600)),
-                        onChanged: _setStatusFilter,
-                        items: [
-                          DropdownMenuItem(
-                            value: null,
-                            child: Text('所有状态', style: TextStyle(color: Colors.grey.shade600)),
-                          ),
-                          ...StudyStatus.values.map((status) {
-                            return DropdownMenuItem(
-                              value: status,
-                              child: Text(_getStatusText(status), style: TextStyle(color: _getStatusColor(status))),
-                            );
-                          }),
-                        ],
-                        dropdownColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.white,
-                        underline: SizedBox(),
-                        icon: Icon(Icons.filter_list, color: Colors.blue.shade700),
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                  
-                  // 收藏过滤
-                  Container(
-                    decoration: BoxDecoration(
-                      color: _showOnlyFavorites ? Colors.yellow.shade100 : (Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Color.fromRGBO(255, 255, 255, 0.9)),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color.fromRGBO(128, 128, 128, 0.2),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.favorite,
-                        color: _showOnlyFavorites ? Colors.red : Colors.grey.shade600,
-                        size: 24,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          _showOnlyFavorites = !_showOnlyFavorites;
-                          _applyFilters();
-                        });
-                      },
-                      tooltip: _showOnlyFavorites ? '显示全部单词' : '只显示收藏单词',
-                    ),
-                  ),
-                  
-                  // 排序方式
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Color.fromRGBO(255, 255, 255, 0.9),
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color.fromRGBO(128, 128, 128, 0.2),
-                          spreadRadius: 2,
-                          blurRadius: 5,
-                          offset: Offset(0, 3),
-                        ),
-                      ],
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: DropdownButton<SortOption>(
-                        value: _sortOption,
-                        onChanged: _setSortOption,
-                        items: SortOption.values.map((option) {
-                          return DropdownMenuItem(
-                            value: option,
-                            child: Text(_getSortOptionText(option), style: TextStyle(color: Colors.grey.shade600)),
-                          );
-                        }).toList(),
-                        dropdownColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.white,
-                        underline: SizedBox(),
-                        icon: Icon(Icons.sort, color: Colors.blue.shade700),
-                        style: TextStyle(fontSize: 16),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            
-            // 单词列表
-            Expanded(
-              child: ListView.builder(
-                itemCount: _filteredWords.length,
+
+              // 过滤和排序选项
+              Container(
                 padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-                itemBuilder: (context, index) {
-                  final word = _filteredWords[index];
-                  return Container(
-                    margin: EdgeInsets.symmetric(vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).brightness == Brightness.dark ? Colors.grey.shade800 : Colors.white,
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color.fromRGBO(128, 128, 128, 0.2),
-                          spreadRadius: 3,
-                          blurRadius: 8,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: ListTile(
-                      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                      title: Text(
-                        word.word,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade700,
-                        ),
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          SizedBox(height: 5),
-                          Text(
-                            word.meaning,
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Theme.of(context).textTheme.bodyMedium?.color,
-                            ),
+                child: Wrap(
+                  spacing: 15,
+                  runSpacing: 15,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    // 学习状态过滤
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Color.fromRGBO(255, 255, 255, 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(128, 128, 128, 0.2),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
                           ),
-                          if (word.phonetic != null && word.phonetic!.isNotEmpty) 
-                            Text(
-                              word.phonetic!,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: Colors.purple.shade500,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
                         ],
                       ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // 收藏按钮
-                          IconButton(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        child: SizedBox(
+                          width: 120,
+                          child: DropdownButtonFormField<StudyStatus?>(
+                            value: _selectedStatusFilter,
+                            hint: Text(
+                              '所有状态',
+                              style: TextStyle(color: Colors.grey.shade600),
+                            ),
+                            onChanged: _setStatusFilter,
+                            items: [
+                              DropdownMenuItem(
+                                value: null,
+                                child: Text(
+                                  '所有状态',
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              ),
+                              ...StudyStatus.values.map((status) {
+                                return DropdownMenuItem(
+                                  value: status,
+                                  child: Text(
+                                    _getStatusText(status),
+                                    style: TextStyle(
+                                      color: _getStatusColor(status),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ],
+                            dropdownColor:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey.shade800
+                                : Colors.white,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                            ),
                             icon: Icon(
-                              word.isFavorite ? Icons.favorite : Icons.favorite_border,
-                              color: word.isFavorite ? Colors.red : Colors.grey.shade400,
-                              size: 28,
+                              Icons.filter_list,
+                              color: Colors.blue.shade700,
                             ),
-                            onPressed: () => _toggleFavorite(word),
-                            tooltip: word.isFavorite ? '取消收藏' : '收藏单词',
+                            style: TextStyle(fontSize: 14),
+                            isExpanded: false,
                           ),
-                          SizedBox(width: 10),
-                          // 学习状态
-                          Container(
-                            padding: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Color.fromRGBO(_getStatusColor(word.status).red, _getStatusColor(word.status).green, _getStatusColor(word.status).blue, 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              _getStatusText(word.status),
-                              style: TextStyle(
-                                color: _getStatusColor(word.status),
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                        ),
+                      ),
+                    ),
+
+                    // 收藏过滤
+                    Container(
+                      decoration: BoxDecoration(
+                        color: _showOnlyFavorites
+                            ? Colors.yellow.shade100
+                            : (Theme.of(context).brightness == Brightness.dark
+                                  ? Colors.grey.shade800
+                                  : Color.fromRGBO(255, 255, 255, 0.9)),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(128, 128, 128, 0.2),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
                           ),
                         ],
                       ),
-                      onTap: () => _editWord(word),
-                      onLongPress: () => _deleteWord(word.id),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.favorite,
+                          color: _showOnlyFavorites
+                              ? Colors.red
+                              : Colors.grey.shade600,
+                          size: 24,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _showOnlyFavorites = !_showOnlyFavorites;
+                            _applyFilters();
+                          });
+                        },
+                        tooltip: _showOnlyFavorites ? '显示全部单词' : '只显示收藏单词',
+                      ),
                     ),
-                  );
-                },
+
+                    // 排序方式
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Color.fromRGBO(255, 255, 255, 0.9),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(128, 128, 128, 0.2),
+                            spreadRadius: 2,
+                            blurRadius: 5,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 10),
+                        child: SizedBox(
+                          width: 120,
+                          child: DropdownButtonFormField<SortOption>(
+                            value: _sortOption,
+                            onChanged: _setSortOption,
+                            items: SortOption.values.map((option) {
+                              return DropdownMenuItem(
+                                value: option,
+                                child: Text(
+                                  _getSortOptionText(option),
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              );
+                            }).toList(),
+                            dropdownColor:
+                                Theme.of(context).brightness == Brightness.dark
+                                ? Colors.grey.shade800
+                                : Colors.white,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(15),
+                                borderSide: BorderSide.none,
+                              ),
+                              filled: false,
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                            icon: Icon(Icons.sort, color: Colors.blue.shade700),
+                            style: TextStyle(fontSize: 14),
+                            isExpanded: false,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
-        ),
-        // 添加单词按钮
-        Positioned(
-          bottom: 25,
-          right: 25,
-          child: GestureDetector(
-            onTap: _addNewWord,
-            child: AnimatedContainer(
-              duration: Duration(milliseconds: 300),
-              width: 65,
-              height: 65,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.circular(32.5),
-                boxShadow: [
-                  BoxShadow(
-                    color: Color.fromRGBO(0, 122, 255, 0.3),
-                    spreadRadius: 8,
-                    blurRadius: 15,
-                    offset: Offset(0, 10),
-                  ),
-                ],
+
+              // 单词列表
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _filteredWords.length,
+                  padding: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
+                  itemBuilder: (context, index) {
+                    final word = _filteredWords[index];
+                    return Container(
+                      margin: EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.grey.shade800
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Color.fromRGBO(128, 128, 128, 0.2),
+                            spreadRadius: 3,
+                            blurRadius: 8,
+                            offset: Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 15,
+                        ),
+                        title: Text(
+                          word.word,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(height: 5),
+                            Text(
+                              word.meaning,
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyMedium?.color,
+                              ),
+                            ),
+                            if (word.phonetic != null &&
+                                word.phonetic!.isNotEmpty)
+                              Text(
+                                word.phonetic!,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.purple.shade500,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // 收藏按钮
+                            IconButton(
+                              icon: Icon(
+                                word.isFavorite
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                                color: word.isFavorite
+                                    ? Colors.red
+                                    : Colors.grey.shade400,
+                                size: 28,
+                              ),
+                              onPressed: () => _toggleFavorite(word),
+                              tooltip: word.isFavorite ? '取消收藏' : '收藏单词',
+                            ),
+                            SizedBox(width: 10),
+                            // 学习状态
+                            Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: 15,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Color.fromRGBO(
+                                  _getStatusColor(word.status).red,
+                                  _getStatusColor(word.status).green,
+                                  _getStatusColor(word.status).blue,
+                                  0.1,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                _getStatusText(word.status),
+                                style: TextStyle(
+                                  color: _getStatusColor(word.status),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _editWord(word),
+                        onLongPress: () => _deleteWord(word.id),
+                      ),
+                    );
+                  },
+                ),
               ),
-              child: Icon(
-                Icons.add,
-                size: 28,
-                color: Colors.white,
+            ],
+          ),
+          // 添加单词按钮
+          Positioned(
+            bottom: 25,
+            right: 25,
+            child: GestureDetector(
+              onTap: _addNewWord,
+              child: AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                width: 65,
+                height: 65,
+                decoration: BoxDecoration(
+                  color: Colors.blue,
+                  borderRadius: BorderRadius.circular(32.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color.fromRGBO(0, 122, 255, 0.3),
+                      spreadRadius: 8,
+                      blurRadius: 15,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(Icons.add, size: 28, color: Colors.white),
               ),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
   }
-  
+
   // 获取学习状态文本
   String _getStatusText(StudyStatus status) {
     switch (status) {
@@ -596,7 +684,7 @@ class _WordBookPageState extends State<WordBookPage> {
         return '已复习';
     }
   }
-  
+
   // 获取学习状态颜色
   Color _getStatusColor(StudyStatus status) {
     switch (status) {
@@ -612,7 +700,7 @@ class _WordBookPageState extends State<WordBookPage> {
         return Colors.blue;
     }
   }
-  
+
   // 获取排序选项文本
   String _getSortOptionText(SortOption option) {
     switch (option) {
@@ -628,7 +716,7 @@ class _WordBookPageState extends State<WordBookPage> {
 
 // 排序选项枚举
 enum SortOption {
-  word,            // 按单词字母顺序
-  lastStudyTime,   // 按最后学习时间
-  memoryStrength,  // 按记忆强度
+  word, // 按单词字母顺序
+  lastStudyTime, // 按最后学习时间
+  memoryStrength, // 按记忆强度
 }

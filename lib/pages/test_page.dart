@@ -598,69 +598,90 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     // 构建选项列表
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: options.map((option) {
-        return ValueListenableBuilder<String?>(
-          valueListenable: _selectedAnswer,
-          builder: (context, selectedAnswer, child) {
-            // 判断当前选项是否被选中
-            final isSelected = selectedAnswer == option;
-            return GestureDetector(
-              onTap: () => _handleAnswerSelect(option), // 点击选择该选项
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: 200), // 动画持续时间
-                margin: EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 20,
-                ), // 选项间距
-                padding: EdgeInsets.symmetric(
-                  horizontal: 25,
-                  vertical: 18,
-                ), // 选项内边距
-                decoration: BoxDecoration(
-                  // 选项背景色：选中时显示蓝色，否则根据主题模式调整
-                  color: isSelected
-                      ? Colors.blue
-                      : (Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey.shade800
-                            : Colors.white),
-                  borderRadius: BorderRadius.circular(25), // 选项圆角
-                  boxShadow: [
-                    // 选项阴影
-                    BoxShadow(
-                      color: isSelected
-                          ? Color.fromRGBO(0, 122, 255, 0.3)
-                          : Color.fromRGBO(128, 128, 128, 0.2),
-                      spreadRadius: isSelected ? 4 : 3,
-                      blurRadius: isSelected ? 12 : 8,
-                      offset: Offset(0, isSelected ? 8 : 5),
-                    ),
-                  ],
-                  border: Border.all(
-                    // 选项边框：选中时显示蓝色边框
-                    color: isSelected
-                        ? Colors.blue.shade400
-                        : Colors.transparent,
-                    width: isSelected ? 3 : 0,
+      children: [
+        // 提示文字
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.only(left: 20, bottom: 15),
+            child: Text(
+              '请选择正确的释义',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            ),
+          ),
+        ),
+        // 选项列表
+        for (int i = 0; i < options.length; i++)
+          _buildMeaningOption(i, options[i], word.meaning),
+      ],
+    );
+  }
+
+  /// 构建释义选项
+  Widget _buildMeaningOption(int index, String meaning, String correctMeaning) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _selectedAnswer,
+      builder: (context, selectedAnswer, child) {
+        final isSelected = selectedAnswer == meaning;
+        final isCorrect = meaning == correctMeaning;
+
+        Color bgColor = Colors.white;
+        Color textColor = Colors.black;
+        Color borderColor = Colors.grey.shade200;
+
+        if (isSelected) {
+          bgColor = Colors.blue.shade50;
+          borderColor = Colors.blue;
+        }
+
+        return GestureDetector(
+          onTap: () => _handleAnswerSelect(meaning),
+          child: Container(
+            margin: EdgeInsets.only(bottom: 15),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 3,
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // 选项标记
+                Container(
+                  width: 24,
+                  height: 24,
+                  margin: EdgeInsets.only(right: 15),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? Colors.blue : Colors.grey.shade300,
+                  ),
+                  child: isSelected
+                      ? Icon(Icons.check, size: 16, color: Colors.white)
+                      : SizedBox(),
+                ),
+
+                // 选项文本
+                Expanded(
+                  child: Text(
+                    meaning,
+                    style: TextStyle(fontSize: 18, color: textColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                child: Text(
-                  option, // 选项文本
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20, // 文本字体大小
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal, // 选中时加粗
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.blue.shade700, // 文本颜色
-                  ),
-                ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
-      }).toList(),
+      },
     );
   }
 

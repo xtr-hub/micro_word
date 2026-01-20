@@ -206,35 +206,72 @@ class _StudyPageState extends State<StudyPage> {
           ],
         ),
         actions: [
-          // 返回主页
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // 关闭对话框
-              // 判断是否可以返回（通过导航栈）
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context); // 返回上一页
-              } else {
-                // 如果无法返回，说明是在PageView中，什么都不做
-                // 继续留在当前页面
-              }
-            },
-            child: Text('返回'),
-          ),
-          // 继续学习
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context); // 关闭对话框
-              // 重新开始学习
-              setState(() {
-                _currentIndex = 0;
-                _initMeaningOptions();
-              });
-              // 自动播放发音
-              if (_settings.autoPlayPronunciation) {
-                _speakWord(_words[_currentIndex].word);
-              }
-            },
-            child: Text('继续学习'),
+          // 使用Row和Expanded实现按钮对称分布
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // 返回主页
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 5),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.grey.shade100,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // 关闭对话框
+                      // 判断是否可以返回（通过导航栈）
+                      if (Navigator.canPop(context)) {
+                        Navigator.pop(context); // 返回上一页
+                      } else {
+                        // 如果无法返回，说明是在PageView中，什么都不做
+                        // 继续留在当前页面
+                      }
+                    },
+                    child: Text(
+                      '返回',
+                      style: TextStyle(fontSize: 16, color: Colors.black87),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 继续学习
+              Expanded(
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 5),
+                  child: TextButton(
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      backgroundColor: Colors.blue,
+                    ),
+                    onPressed: () {
+                      Navigator.pop(context); // 关闭对话框
+                      // 重新开始学习
+                      setState(() {
+                        _currentIndex = 0;
+                        _initMeaningOptions();
+                      });
+                      // 自动播放发音
+                      if (_settings.autoPlayPronunciation) {
+                        _speakWord(_words[_currentIndex].word);
+                      }
+                    },
+                    child: Text(
+                      '继续学习',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
