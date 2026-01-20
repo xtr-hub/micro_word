@@ -30,6 +30,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 每天学习目标单词数
   int _dailyGoal = 20;
 
+  /// 每天复习目标单词数
+  int _dailyReviewGoal = 50;
+
   /// 主题模式（浅色、深色或跟随系统）
   late ThemeMode _themeMode;
 
@@ -75,6 +78,7 @@ class _SettingsPageState extends State<SettingsPage> {
     // 加载学习进度数据
     _progress = await StudyProgress.load();
     _dailyGoal = _progress.dailyGoal; // 设置每天学习目标
+    _dailyReviewGoal = _progress.dailyReviewGoal; // 设置每天复习目标
 
     // 加载用户设置
     _settings = await Settings.load();
@@ -97,11 +101,22 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  /// 更新每天复习目标
+  ///
+  /// 参数：
+  /// - value: 新的每天复习目标单词数
+  void _updateDailyReviewGoal(double value) {
+    setState(() {
+      _dailyReviewGoal = value.toInt(); // 更新目标值
+    });
+  }
+
   /// 保存设置
   ///
   /// 将当前设置保存到本地存储
   void _saveSettings() {
-    _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日目标
+    _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日学习目标
+    _progress.dailyReviewGoal = _dailyReviewGoal; // 更新学习进度中的每日复习目标
     _progress.save(); // 保存学习进度
 
     _settings.save(); // 保存用户设置
@@ -214,6 +229,44 @@ class _SettingsPageState extends State<SettingsPage> {
                   activeColor: Colors.blue, // 已选择部分颜色
                   inactiveColor: Colors.grey.shade300, // 未选择部分颜色
                   thumbColor: Colors.blue, // 滑块颜色
+                ),
+              ),
+              SizedBox(height: 10),
+              // 每天复习单词数设置
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 5,
+                ),
+                title: Text(
+                  '每天复习单词数',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                subtitle: Text(
+                  '$_dailyReviewGoal个单词/天', // 显示当前目标值
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ),
+              // 滑动条，用于调整每天复习单词数
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Slider(
+                  value: _dailyReviewGoal.toDouble(), // 当前值
+                  min: 5, // 最小值
+                  max: 200, // 最大值
+                  divisions: 39, // 刻度数
+                  label: '$_dailyReviewGoal', // 滑动时显示的标签
+                  onChanged: _updateDailyReviewGoal, // 滑动时的回调函数
+                  activeColor: Colors.green, // 已选择部分颜色
+                  inactiveColor: Colors.grey.shade300, // 未选择部分颜色
+                  thumbColor: Colors.green, // 滑块颜色
                 ),
               ),
             ]),
@@ -361,7 +414,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   child: DropdownButton<PronunciationType>(
                     value: _pronunciationType, // 当前选中的发音类型
-                    onChanged: (type) => _togglePronunciationType(type!), // 选择变化时的回调
+                    onChanged: (type) =>
+                        _togglePronunciationType(type!), // 选择变化时的回调
                     items: PronunciationType.values.map((type) {
                       // 发音类型选项
                       return DropdownMenuItem(

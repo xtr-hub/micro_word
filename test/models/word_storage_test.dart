@@ -8,6 +8,27 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   group('WordStorage tests', () {
+    test('Verify test words were added successfully', () async {
+      // 加载当前单词列表
+      final words = await WordStorage.loadWords();
+
+      // 打印单词数量
+      print('Current total words: ${words.length}');
+
+      // 检查是否有至少50个单词
+      expect(words.length, greaterThanOrEqualTo(50));
+
+      // 检查是否包含特定测试单词
+      final testWords = ['apple', 'banana', 'cherry', 'dog', 'cat', 'elephant'];
+      for (final testWord in testWords) {
+        final found = words.any((word) => word.word.toLowerCase() == testWord);
+        expect(found, isTrue, reason: 'Test word "$testWord" not found');
+        print('✓ Found test word: $testWord');
+      }
+
+      print('All test words found successfully! Total words: ${words.length}');
+    });
+
     test('WordStorage should add and save words correctly', () async {
       // 创建一个测试单词
       final testWord = Word(

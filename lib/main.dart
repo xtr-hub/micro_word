@@ -16,6 +16,21 @@ import 'pages/home_page.dart';
 /// 启动页组件，应用启动时显示的第一个页面
 import 'pages/splash_page.dart';
 
+/// 学习页面组件
+import 'pages/study_page.dart';
+
+/// 复习页面组件
+import 'pages/review_page.dart';
+
+/// 测试页面组件
+import 'pages/test_page.dart';
+
+/// 单词本页面组件
+import 'pages/word_book_page.dart';
+
+/// 设置页面组件
+import 'pages/settings_page.dart';
+
 /// 应用程序的入口点
 ///
 /// Flutter应用总是从main函数开始执行
@@ -171,8 +186,12 @@ class WordApp extends StatelessWidget {
       /// 路由表用于管理页面导航，通过路由名称可以跳转到对应的页面
       /// 键是路由名称，值是一个函数，返回对应的页面组件
       routes: {
-        '/home': (context) =>
-            HomePage(), // 主页面路由，通过Navigator.pushNamed(context, '/home')可以跳转到主页面
+        '/home': (context) => HomePage(), // 主页面路由
+        '/study': (context) => StudyPage(), // 学习页面路由
+        '/review': (context) => ReviewPage(), // 复习页面路由
+        '/test': (context) => TestPage(), // 测试页面路由
+        '/wordbook': (context) => WordBookPage(), // 单词本页面路由
+        '/settings': (context) => SettingsPage(), // 设置页面路由
       },
     );
   }
