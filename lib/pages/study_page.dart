@@ -1,7 +1,9 @@
+import 'dart:async'; // 计时器相关库
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
 import '../models/word_storage.dart'; // 单词存储服务
 import '../models/study_progress.dart'; // 学习进度模型
+import '../models/settings.dart'; // 用户设置模型
 import '../services/audio_service.dart'; // 音频播放服务
 
 /// 学习页面
@@ -36,11 +38,23 @@ class _StudyPageState extends State<StudyPage> {
   /// 学习进度对象，用于记录和更新学习数据
   late StudyProgress _progress;
 
+  /// 用户设置对象
+  late Settings _settings;
+
   /// 当前选择的学习状态
   StudyStatus _selectedStatus = StudyStatus.learning;
 
   /// 数据加载状态
   bool _isLoading = true;
+
+  /// 学习时长计时器
+  Timer? _studyTimer;
+
+  /// 当前学习会话开始时间
+  DateTime? _sessionStartTime;
+
+  /// 本次会话累计学习时长（秒）
+  int _sessionStudyTime = 0;
 
   /// 页面初始化时调用
   @override
@@ -50,9 +64,54 @@ class _StudyPageState extends State<StudyPage> {
     _loadData();
   }
 
+  /// 当页面可见时调用
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 启动学习时长计时
+    _startStudyTimer();
+  }
+
+  /// 启动学习时长计时器
+  void _startStudyTimer() {
+    if (_studyTimer == null || !_studyTimer!.isActive) {
+      _sessionStartTime = DateTime.now();
+      _sessionStudyTime = 0;
+
+      // 每秒更新一次学习时长（不触发UI刷新）
+      _studyTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+        _sessionStudyTime = DateTime.now()
+            .difference(_sessionStartTime!)
+            .inSeconds;
+      });
+    }
+  }
+
+  /// 停止学习时长计时器并保存学习时长
+  void _stopStudyTimer() {
+    if (_studyTimer != null) {
+      _studyTimer!.cancel();
+      _studyTimer = null;
+
+      // 如果学习了至少1秒，保存学习时长
+      if (_sessionStudyTime > 0) {
+        _progress.updateStudyTime(_sessionStudyTime);
+        _sessionStudyTime = 0;
+      }
+    }
+  }
+
+  /// 页面销毁时调用
+  @override
+  void dispose() {
+    // 停止计时器并保存学习时长
+    _stopStudyTimer();
+    super.dispose();
+  }
+
   /// 加载单词数据和学习进度
   ///
-  /// 从本地存储加载单词列表和学习进度信息
+  /// 从本地存储加载单词列表、学习进度和用户设置
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true; // 开始加载，显示加载指示器
@@ -62,14 +121,26 @@ class _StudyPageState extends State<StudyPage> {
     _words = await WordStorage.loadWords();
     // 从本地存储加载学习进度
     _progress = await StudyProgress.load();
+    // 从本地存储加载用户设置
+    _settings = await Settings.load();
 
+    // 根据用户设置更新显示状态
     setState(() {
+      _showExample = _settings.showExampleByDefault;
       _isLoading = false; // 加载完成，隐藏加载指示器
     });
 
-    // 加载完成后自动播放当前单词的音频
-    if (_words.isNotEmpty) {
+    // 加载完成后根据设置自动播放当前单词的音频
+    if (_words.isNotEmpty && _settings.autoPlayPronunciation) {
       _speakWord(_words[_currentIndex].word);
+
+      // 如果例句默认显示，且例句存在，播放例句发音
+      if (_showExample && _words[_currentIndex].example != null) {
+        // 延迟一段时间播放例句，避免与单词发音重叠
+        Future.delayed(Duration(seconds: 1), () {
+          _speakWord(_words[_currentIndex].example!);
+        });
+      }
     }
   }
 
@@ -94,6 +165,14 @@ class _StudyPageState extends State<StudyPage> {
     setState(() {
       _showExample = !_showExample;
     });
+
+    // 如果例句已经显示并且自动播放发音设置开启，播放例句发音
+    if (_showExample && _settings.autoPlayPronunciation) {
+      final currentWord = _words[_currentIndex];
+      if (currentWord.example != null) {
+        _speakWord(currentWord.example!);
+      }
+    }
   }
 
   /// 处理学习状态选择
@@ -123,15 +202,25 @@ class _StudyPageState extends State<StudyPage> {
     // 重置状态，准备学习下一个单词
     setState(() {
       _showMeaning = false; // 隐藏释义
-      _showExample = false; // 隐藏例句
+      _showExample = _settings.showExampleByDefault; // 根据设置决定是否显示例句
       _selectedStatus = StudyStatus.learning; // 默认选择"不认识"状态
 
       // 移动到下一个单词索引，如果到达末尾则循环到开头
       _currentIndex = (_currentIndex + 1) % _words.length;
     });
 
-    // 切换到下一个单词后自动播放音频
-    _speakWord(_words[_currentIndex].word);
+    // 切换到下一个单词后根据设置自动播放音频
+    if (_settings.autoPlayPronunciation) {
+      _speakWord(_words[_currentIndex].word);
+
+      // 如果例句默认显示，且例句存在，播放例句发音
+      if (_showExample && _words[_currentIndex].example != null) {
+        // 延迟一段时间播放例句，避免与单词发音重叠
+        Future.delayed(Duration(seconds: 1), () {
+          _speakWord(_words[_currentIndex].example!);
+        });
+      }
+    }
   }
 
   /// 构建页面UI
@@ -407,16 +496,28 @@ class _StudyPageState extends State<StudyPage> {
                               SizedBox(height: 15), // 标题与内容间距
                               // 只有在_showExample为true时显示例句内容
                               if (_showExample)
-                                Text(
-                                  currentWord.example!, // 单词例句
-                                  style: TextStyle(
-                                    fontSize: 20, // 例句字体大小
-                                    color: Theme.of(
-                                      context,
-                                    ).textTheme.bodyLarge?.color, // 例句颜色
-                                    fontStyle: FontStyle.italic, // 斜体样式
-                                  ),
-                                  textAlign: TextAlign.center, // 居中对齐
+                                Column(
+                                  children: [
+                                    Text(
+                                      currentWord.example!, // 单词例句
+                                      style: TextStyle(
+                                        fontSize: 20, // 例句字体大小
+                                        color: Theme.of(
+                                          context,
+                                        ).textTheme.bodyLarge?.color, // 例句颜色
+                                        fontStyle: FontStyle.italic, // 斜体样式
+                                      ),
+                                      textAlign: TextAlign.center, // 居中对齐
+                                    ),
+                                    SizedBox(height: 10), // 例句与播放按钮间距
+                                    // 例句发音按钮
+                                    _AnimatedPlayButton(
+                                      onPressed: () =>
+                                          _speakWord(currentWord.example!),
+                                      size: 28,
+                                      color: Colors.green,
+                                    ),
+                                  ],
                                 ),
                             ],
                           ),
@@ -558,7 +659,7 @@ class _StudyPageState extends State<StudyPage> {
 ///
 /// 功能：
 /// - 带有按下动画效果的播放按钮
-/// - 支持自定义大小和提示文本
+/// - 支持自定义大小、颜色和提示文本
 /// - 点击时调用指定的回调函数
 class _AnimatedPlayButton extends StatefulWidget {
   /// 按钮点击时的回调函数
@@ -567,12 +668,16 @@ class _AnimatedPlayButton extends StatefulWidget {
   /// 按钮图标大小
   final double size;
 
+  /// 按钮颜色
+  final MaterialColor color;
+
   /// 按钮提示文本
   final String? tooltip;
 
   const _AnimatedPlayButton({
     required this.onPressed,
     this.size = 32.0,
+    this.color = Colors.blue,
     this.tooltip,
   });
 
@@ -635,13 +740,13 @@ class __AnimatedPlayButtonState extends State<_AnimatedPlayButton> {
           transformAlignment: Alignment.center, // 变换中心点
           decoration: BoxDecoration(
             shape: BoxShape.circle, // 圆形背景
-            // 背景色：按下时显示浅蓝色，否则透明
-            color: _isPressed ? Colors.blue.shade100 : Colors.transparent,
+            // 背景色：按下时显示浅色，否则透明
+            color: _isPressed ? widget.color.shade100 : Colors.transparent,
             boxShadow: [
               // 按下时显示阴影
               if (_isPressed)
                 BoxShadow(
-                  color: Colors.blue.shade300,
+                  color: widget.color.shade300,
                   spreadRadius: 2,
                   blurRadius: 6,
                   offset: Offset(0, 2),
@@ -653,8 +758,8 @@ class __AnimatedPlayButtonState extends State<_AnimatedPlayButton> {
             duration: Duration(milliseconds: 150), // 图标动画持续时间
             child: Icon(
               Icons.volume_up, // 音量图标
-              // 图标颜色：按下时深蓝色，否则浅蓝色
-              color: _isPressed ? Colors.blue.shade700 : Colors.blue.shade500,
+              // 图标颜色：按下时深色，否则浅色
+              color: _isPressed ? widget.color.shade700 : widget.color.shade500,
               size: widget.size, // 图标大小
             ),
           ),

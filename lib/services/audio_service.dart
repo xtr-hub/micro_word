@@ -1,4 +1,5 @@
 import 'package:flutter_tts/flutter_tts.dart'; // 引入Flutter TTS（文本转语音）库
+import '../models/settings.dart'; // 导入设置模型，使用PronunciationType枚举
 
 /// 音频服务类
 ///
@@ -12,6 +13,7 @@ import 'package:flutter_tts/flutter_tts.dart'; // 引入Flutter TTS（文本转�
 /// - 基于第三方库 `flutter_tts` 实现
 /// - 支持设置音量、语速、音调等参数
 /// - 支持事件监听（开始播放、播放完成、播放错误）
+/// - 支持切换美式/英式英语发音
 class AudioService {
   /// 单例实例，使用静态常量确保唯一
   static final AudioService _instance = AudioService._internal();
@@ -30,6 +32,11 @@ class AudioService {
   ///
   /// true表示正在播放音频，false表示未播放
   bool _isSpeaking = false;
+
+  /// 当前发音类型
+  ///
+  /// 默认使用美式英语发音
+  PronunciationType _pronunciationType = PronunciationType.american;
 
   /// 私有构造函数，用于初始化单例实例
   ///
@@ -54,7 +61,7 @@ class AudioService {
     _flutterTts.setSpeechRate(1.0); // 语速：0.0（最慢）到1.0（正常），可超过1.0
     _flutterTts.setPitch(1.0); // 音调：0.5（低沉）到2.0（尖锐）
 
-    // 设置语音语言为美式英语
+    // 设置语音语言为美式英语（默认）
     _flutterTts.setLanguage('en-US');
 
     // 设置TTS事件监听器
@@ -73,6 +80,26 @@ class AudioService {
       print('TTS错误: $message'); // 打印错误信息
       _isSpeaking = false; // 更新说话状态为未播放
     });
+  }
+
+  /// 设置发音类型
+  ///
+  /// 参数：
+  /// - type: 要设置的发音类型（美式或英式）
+  ///
+  /// 功能：
+  /// - 更新当前发音类型
+  /// - 根据发音类型设置对应的TTS语言代码
+  /// - en-US: 美式英语
+  /// - en-GB: 英式英语
+  Future<void> setPronunciationType(PronunciationType type) async {
+    _pronunciationType = type;
+    // 根据发音类型设置对应的语言代码
+    if (type == PronunciationType.american) {
+      await _flutterTts.setLanguage('en-US');
+    } else {
+      await _flutterTts.setLanguage('en-GB');
+    }
   }
 
   /// 播放单词发音

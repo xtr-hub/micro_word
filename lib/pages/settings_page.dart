@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习数据图表
 import 'package:provider/provider.dart'; // 状态管理库，用于主题切换
 import '../models/study_progress.dart'; // 学习进度模型
+import '../models/settings.dart'; // 用户设置模型
 import '../providers/theme_provider.dart'; // 主题状态管理
 
 /// 设置页面
@@ -23,6 +24,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 学习进度对象，用于存储和显示学习数据
   late StudyProgress _progress;
 
+  /// 用户设置对象
+  late Settings _settings;
+
   /// 每天学习目标单词数
   int _dailyGoal = 20;
 
@@ -34,6 +38,9 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 是否默认显示例句
   bool _showExampleByDefault = false;
+
+  /// 当前发音类型
+  PronunciationType _pronunciationType = PronunciationType.american;
 
   /// 数据加载状态
   bool _isLoading = true;
@@ -69,6 +76,12 @@ class _SettingsPageState extends State<SettingsPage> {
     _progress = await StudyProgress.load();
     _dailyGoal = _progress.dailyGoal; // 设置每天学习目标
 
+    // 加载用户设置
+    _settings = await Settings.load();
+    _autoPlayPronunciation = _settings.autoPlayPronunciation;
+    _showExampleByDefault = _settings.showExampleByDefault;
+    _pronunciationType = _settings.pronunciationType;
+
     setState(() {
       _isLoading = false; // 加载完成，隐藏加载指示器
     });
@@ -89,7 +102,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 将当前设置保存到本地存储
   void _saveSettings() {
     _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日目标
-    _progress.save(); // 保存到本地存储
+    _progress.save(); // 保存学习进度
+
+    _settings.save(); // 保存用户设置
 
     // 显示保存成功提示
     ScaffoldMessenger.of(context).showSnackBar(
@@ -118,6 +133,7 @@ class _SettingsPageState extends State<SettingsPage> {
   void _toggleAutoPlayPronunciation(bool value) {
     setState(() {
       _autoPlayPronunciation = value;
+      _settings.autoPlayPronunciation = value;
     });
   }
 
@@ -128,6 +144,18 @@ class _SettingsPageState extends State<SettingsPage> {
   void _toggleShowExampleByDefault(bool value) {
     setState(() {
       _showExampleByDefault = value;
+      _settings.showExampleByDefault = value;
+    });
+  }
+
+  /// 切换发音类型
+  ///
+  /// 参数：
+  /// - type: 要切换到的发音类型
+  void _togglePronunciationType(PronunciationType type) {
+    setState(() {
+      _pronunciationType = type;
+      _settings.pronunciationType = type;
     });
   }
 
@@ -306,6 +334,77 @@ class _SettingsPageState extends State<SettingsPage> {
                 onChanged: _toggleShowExampleByDefault, // 开关变化时的回调
                 activeThumbColor: Colors.blue, // 开关激活时的滑块颜色
                 inactiveThumbColor: Colors.grey.shade400, // 开关未激活时的滑块颜色
+              ),
+
+              // 发音类型选择
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '发音类型',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                trailing: Container(
+                  // 下拉选择框容器
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButton<PronunciationType>(
+                    value: _pronunciationType, // 当前选中的发音类型
+                    onChanged: (type) => _togglePronunciationType(type!), // 选择变化时的回调
+                    items: PronunciationType.values.map((type) {
+                      // 发音类型选项
+                      return DropdownMenuItem(
+                        value: type,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            _getPronunciationTypeText(type), // 显示发音类型文本
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color, // 字体颜色
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    underline: SizedBox(), // 移除下拉框下划线
+                    icon: Icon(
+                      // 下拉箭头
+                      Icons.arrow_drop_down,
+                      color: Colors.blue.shade700,
+                    ),
+                    dropdownColor: // 下拉菜单背景色
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.white,
+                    menuMaxHeight: 200, // 下拉菜单最大高度
+                    style: TextStyle(
+                      // 下拉菜单项样式
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                    borderRadius: BorderRadius.circular(15), // 下拉菜单圆角
+                  ),
+                ),
               ),
             ]),
 
@@ -608,6 +707,21 @@ class _SettingsPageState extends State<SettingsPage> {
         return '深色模式';
       case ThemeMode.system:
         return '跟随系统';
+    }
+  }
+
+  /// 获取发音类型的中文文本
+  ///
+  /// 参数：
+  /// - type: 发音类型枚举值
+  ///
+  /// 返回：发音类型的中文描述
+  String _getPronunciationTypeText(PronunciationType type) {
+    switch (type) {
+      case PronunciationType.american:
+        return '美式发音';
+      case PronunciationType.british:
+        return '英式发音';
     }
   }
 

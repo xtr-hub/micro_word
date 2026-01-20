@@ -1,7 +1,9 @@
+import 'dart:async'; // 计时器相关库
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
 import '../models/word_storage.dart'; // 单词存储服务
 import '../models/study_progress.dart'; // 学习进度模型
+import '../models/settings.dart'; // 用户设置模型
 import '../services/audio_service.dart'; // 音频播放服务
 
 /// 测试页面
@@ -11,6 +13,7 @@ import '../services/audio_service.dart'; // 音频播放服务
 /// - 随机生成10个单词进行测试
 /// - 支持播放单词发音
 /// - 实时统计测试结果
+/// - 测试完成后显示详细结果
 /// - 测试完成后显示详细结果
 /// - 根据测试结果更新单词学习状态
 class TestPage extends StatefulWidget {
@@ -50,6 +53,18 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 学习进度对象
   late StudyProgress _progress;
 
+  /// 用户设置对象
+  late Settings _settings;
+
+  /// 学习时长计时器
+  Timer? _studyTimer;
+
+  /// 当前学习会话开始时间
+  DateTime? _sessionStartTime;
+
+  /// 本次会话累计学习时长（秒）
+  int _sessionStudyTime = 0;
+
   /// 页面初始化时调用
   @override
   void initState() {
@@ -58,6 +73,61 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     // 加载单词数据和学习进度
     _loadData();
+  }
+
+  /// 当页面可见时调用
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 启动学习时长计时
+    _startStudyTimer();
+  }
+
+  /// 启动学习时长计时器
+  void _startStudyTimer() {
+    if (_studyTimer == null || !_studyTimer!.isActive) {
+      _sessionStartTime = DateTime.now();
+      _sessionStudyTime = 0;
+
+      // 每秒更新一次学习时长（不触发UI刷新）
+      _studyTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+        _sessionStudyTime = DateTime.now()
+            .difference(_sessionStartTime!)
+            .inSeconds;
+      });
+    }
+  }
+
+  /// 停止学习时长计时器并保存学习时长
+  void _stopStudyTimer() {
+    if (_studyTimer != null) {
+      _studyTimer!.cancel();
+      _studyTimer = null;
+
+      // 如果学习了至少1秒，保存学习时长
+      if (_sessionStudyTime > 0) {
+        _progress.updateStudyTime(_sessionStudyTime);
+        _sessionStudyTime = 0;
+      }
+    }
+  }
+
+  /// 监听应用生命周期变化
+  ///
+  /// 当页面可见性发生变化时，停止或恢复音频播放和学习计时
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // 当页面不可见时，停止音频播放和学习计时
+    if (state == AppLifecycleState.paused) {
+      _stopAudio();
+      _stopStudyTimer();
+    }
+    // 当页面重新可见时，恢复学习计时
+    else if (state == AppLifecycleState.resumed) {
+      _startStudyTimer();
+    }
   }
 
   /// 播放单词发音
@@ -76,22 +146,19 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     await AudioService().stop();
   }
 
-  /// 监听应用生命周期变化
-  ///
-  /// 当页面可见性发生变化时，停止或恢复音频播放
+  /// 页面销毁时调用
   @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    // 当页面不可见时，停止音频播放
-    if (state == AppLifecycleState.paused) {
-      _stopAudio();
-    }
+  void dispose() {
+    // 停止计时器并保存学习时长
+    _stopStudyTimer();
+    // 移除应用生命周期观察者
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   /// 加载单词数据和学习进度
   ///
-  /// 从本地存储加载单词列表和学习进度信息
+  /// 从本地存储加载单词列表、学习进度和用户设置
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true; // 开始加载，显示加载指示器
@@ -101,6 +168,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _words = await WordStorage.loadWords();
     // 从本地存储加载学习进度
     _progress = await StudyProgress.load();
+    // 从本地存储加载用户设置
+    _settings = await Settings.load();
     // 生成测试单词列表
     _generateTestWords();
 
@@ -108,8 +177,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       _isLoading = false; // 加载完成，隐藏加载指示器
     });
 
-    // 数据加载完成后，自动播放当前单词的音频
-    if (_testWords.isNotEmpty) {
+    // 数据加载完成后，根据设置自动播放当前单词的音频
+    if (_testWords.isNotEmpty && _settings.autoPlayPronunciation) {
       _speakWord(_testWords[_currentIndex].word);
     }
   }
@@ -203,8 +272,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       }
     });
 
-    // 如果还有下一个单词，自动播放音频
-    if (_currentIndex < _testWords.length) {
+    // 如果还有下一个单词，根据设置自动播放音频
+    if (_currentIndex < _testWords.length && _settings.autoPlayPronunciation) {
       _speakWord(_testWords[_currentIndex].word);
     }
 

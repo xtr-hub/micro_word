@@ -131,6 +131,7 @@ class WordStorage {
         meaning: '苹果',
         phonetic: '/ˈæpl/',
         example: 'I eat an apple every day.',
+        exampleMeaning: '我每天吃一个苹果。',
       ),
       Word(
         id: 2,
@@ -138,6 +139,7 @@ class WordStorage {
         meaning: '香蕉',
         phonetic: '/bəˈnɑːnə/',
         example: 'Bananas are rich in potassium.',
+        exampleMeaning: '香蕉富含钾元素。',
       ),
       Word(
         id: 3,
@@ -145,6 +147,7 @@ class WordStorage {
         meaning: '樱桃',
         phonetic: '/ˈtʃeri/',
         example: 'The cherries are ripe now.',
+        exampleMeaning: '樱桃现在成熟了。',
       ),
       Word(
         id: 4,
@@ -152,6 +155,7 @@ class WordStorage {
         meaning: '日期；枣',
         phonetic: '/deɪt/',
         example: 'What is the date today?',
+        exampleMeaning: '今天是几号？',
       ),
       Word(
         id: 5,
@@ -159,6 +163,7 @@ class WordStorage {
         meaning: '大象',
         phonetic: '/ˈelɪfənt/',
         example: 'Elephants are the largest land animals.',
+        exampleMeaning: '大象是最大的陆地动物。',
       ),
       Word(
         id: 6,
@@ -166,6 +171,7 @@ class WordStorage {
         meaning: '朋友',
         phonetic: '/frend/',
         example: 'He is my best friend.',
+        exampleMeaning: '他是我最好的朋友。',
       ),
       Word(
         id: 7,
@@ -173,6 +179,7 @@ class WordStorage {
         meaning: '吉他',
         phonetic: '/ɡɪˈtɑːr/',
         example: 'She plays the guitar very well.',
+        exampleMeaning: '她吉他弹得非常好。',
       ),
       Word(
         id: 8,
@@ -180,6 +187,7 @@ class WordStorage {
         meaning: '快乐的',
         phonetic: '/ˈhæpi/',
         example: 'I feel very happy today.',
+        exampleMeaning: '我今天感到非常开心。',
       ),
       Word(
         id: 9,
@@ -187,6 +195,7 @@ class WordStorage {
         meaning: '互联网',
         phonetic: '/ˈɪntərnet/',
         example: 'I use the internet every day.',
+        exampleMeaning: '我每天使用互联网。',
       ),
       Word(
         id: 10,
@@ -194,6 +203,7 @@ class WordStorage {
         meaning: '丛林',
         phonetic: '/ˈdʒʌŋɡl/',
         example: 'Tigers live in the jungle.',
+        exampleMeaning: '老虎生活在丛林中。',
       ),
     ];
   }

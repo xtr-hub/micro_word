@@ -34,6 +34,12 @@ class Word {
   /// 例如："I eat an apple every day."等
   final String? example;
 
+  /// 单词例句的中文释义
+  ///
+  /// 可为空，表示有些单词的例句可能没有释义
+  /// 例如："我每天吃一个苹果。"等
+  final String? exampleMeaning;
+
   /// 单词的学习状态
   ///
   /// 使用StudyStatus枚举表示，可取值：
@@ -68,6 +74,7 @@ class Word {
   /// - meaning：中文释义，必填
   /// - phonetic：音标，可选
   /// - example：例句，可选
+  /// - exampleMeaning：例句中文释义，可选
   /// - status：学习状态，默认值为StudyStatus.newWord
   /// - lastStudyTime：最后学习时间，默认值为当前时间
   /// - memoryStrength：记忆强度，默认值为0
@@ -78,6 +85,7 @@ class Word {
     required this.meaning, // 必填：中文释义
     this.phonetic, // 可选：音标
     this.example, // 可选：例句
+    this.exampleMeaning, // 可选：例句中文释义
     this.status = StudyStatus.newWord, // 可选：学习状态，默认值为新单词
     DateTime? lastStudyTime, // 可选：最后学习时间
     this.memoryStrength = 0, // 可选：记忆强度，默认值为0
@@ -103,6 +111,7 @@ class Word {
       meaning: json['meaning'], // 从JSON中获取释义
       phonetic: json['phonetic'], // 从JSON中获取音标
       example: json['example'], // 从JSON中获取例句
+      exampleMeaning: json['exampleMeaning'], // 从JSON中获取例句中文释义
       status: StudyStatus.values[json['status']], // 将JSON中的数字转换为StudyStatus枚举
       lastStudyTime: DateTime.fromMillisecondsSinceEpoch(
         json['lastStudyTime'],
@@ -127,6 +136,7 @@ class Word {
       'meaning': meaning, // 保存释义
       'phonetic': phonetic, // 保存音标
       'example': example, // 保存例句
+      'exampleMeaning': exampleMeaning, // 保存例句中文释义
       'status': status.index, // 将StudyStatus枚举转换为数字保存
       'lastStudyTime':
           lastStudyTime.millisecondsSinceEpoch, // 将DateTime转换为毫秒时间戳保存
