@@ -394,67 +394,68 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
 
               SizedBox(height: 20), // 垂直间距
-              // 今日目标达成率
+              // 今日学习数据 - 3个小卡片设计
               Container(
                 padding: EdgeInsets.all(20),
                 child: Column(
                   children: [
                     Text(
-                      '今日目标达成率',
+                      '今日学习数据',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Theme.of(context).textTheme.bodyLarge?.color,
                       ),
                     ),
-                    SizedBox(height: 20),
-                    SizedBox(
-                      height: 150,
-                      child: BarChart(
-                        // 柱状图组件，用于显示今日学习目标达成情况
-                        BarChartData(
-                          alignment: BarChartAlignment.spaceAround, // 柱子对齐方式
-                          barTouchData: BarTouchData(enabled: true), // 启用触摸交互
-                          titlesData: FlTitlesData(show: false), // 不显示坐标轴标题
-                          borderData: FlBorderData(show: false), // 不显示边框
-                          gridData: FlGridData(
-                            // 网格线配置
-                            show: true,
-                            horizontalInterval: 1,
-                            verticalInterval: 1,
-                          ),
-                          barGroups: [
-                            // 柱子组
-                            BarChartGroupData(
-                              x: 0, // 柱子x坐标
-                              barRods: [
-                                // 柱子列表
-                                BarChartRodData(
-                                  toY: _progress.todayWordsStudied
-                                      .toDouble(), // 柱子高度（今日已学单词数）
-                                  color: Colors.blue, // 柱子颜色
-                                  width: 80, // 柱子宽度
-                                  borderRadius: BorderRadius.circular(
-                                    40,
-                                  ), // 柱子圆角
-                                ),
-                              ],
+                    SizedBox(height: 15),
+                    // 卡片容器：使用Row实现水平布局，确保卡片在同一行
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // 卡片1：今日已学习单词数
+                        Flexible(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 7.5),
+                            child: _buildDataCard(
+                              context: context,
+                              title: '今日已学',
+                              value: '${_progress.todayWordsStudied}',
+                              unit: '个单词',
+                              color: Colors.blue,
+                              icon: Icons.book,
                             ),
-                          ],
-                          maxY: _progress.dailyGoal
-                              .toDouble(), // 图表最大高度（每日目标单词数）
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(height: 10),
-                    Text(
-                      // 计算并显示达成率
-                      '${((_progress.todayWordsStudied / _progress.dailyGoal) * 100).toInt()}% 达成目标',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
+                        // 卡片2：今日目标单词数
+                        Flexible(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 7.5),
+                            child: _buildDataCard(
+                              context: context,
+                              title: '今日目标',
+                              value: '${_progress.dailyGoal}',
+                              unit: '个单词',
+                              color: Colors.green,
+                              icon: Icons.flag,
+                            ),
+                          ),
+                        ),
+                        // 卡片3：目标达成率
+                        Flexible(
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 7.5),
+                            child: _buildDataCard(
+                              context: context,
+                              title: '达成率',
+                              value:
+                                  '${((_progress.todayWordsStudied / (_progress.dailyGoal > 0 ? _progress.dailyGoal : 1)) * 100).toInt()}',
+                              unit: '%',
+                              color: Colors.orange,
+                              icon: Icons.trending_up,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -608,6 +609,79 @@ class _SettingsPageState extends State<SettingsPage> {
       case ThemeMode.system:
         return '跟随系统';
     }
+  }
+
+  /// 构建数据卡片
+  ///
+  /// 创建一个美观的小卡片，用于显示学习数据
+  ///
+  /// 参数：
+  /// - context: 上下文
+  /// - title: 卡片标题
+  /// - value: 卡片数值
+  /// - unit: 数值单位
+  /// - color: 卡片主题色
+  /// - icon: 卡片图标
+  ///
+  /// 返回：构建好的数据卡片Widget
+  Widget _buildDataCard({
+    required BuildContext context,
+    required String title,
+    required String value,
+    required String unit,
+    required Color color,
+    required IconData icon,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        // 卡片背景色：根据主题模式调整
+        color: Theme.of(context).brightness == Brightness.dark
+            ? Colors.grey.shade800
+            : Colors.white,
+        borderRadius: BorderRadius.circular(15), // 卡片圆角
+        boxShadow: [
+          // 卡片阴影
+          BoxShadow(
+            color: Color.fromRGBO(128, 128, 128, 0.2),
+            spreadRadius: 3,
+            blurRadius: 10,
+            offset: Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // 图标
+          Icon(icon, color: color, size: 24),
+          SizedBox(height: 10),
+          // 标题
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+            ),
+          ),
+          SizedBox(height: 5),
+          // 数值
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          // 单位
+          Text(
+            unit,
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 格式化学习时长
