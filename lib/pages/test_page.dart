@@ -2,9 +2,14 @@ import 'dart:async'; // 计时器相关库
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
 import '../models/word_storage.dart'; // 单词存储服务
+import '../models/word_list.dart'; // 单词表数据模型
+import '../models/word_list_storage.dart'; // 单词表存储服务
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
+import '../models/test_record.dart'; // 测试记录模型
 import '../services/audio_service.dart'; // 音频播放服务
+import './test_result_page.dart'; // 测试结果页面
+import './test_history_page.dart'; // 测试历史页面
 
 /// 测试页面
 ///
@@ -29,6 +34,12 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
 
   /// 所有单词列表
   late List<Word> _words;
+
+  /// 当前单词表
+  late WordList _currentWordList;
+
+  /// 过滤后的单词列表（当前单词表中的单词）
+  late List<Word> _filteredWords;
 
   /// 当前测试的单词列表（随机选择10个）
   late List<Word> _testWords;
@@ -164,12 +175,28 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       _isLoading = true; // 开始加载，显示加载指示器
     });
 
-    // 从本地存储加载单词列表
-    _words = await WordStorage.loadWords();
-    // 从本地存储加载学习进度
-    _progress = await StudyProgress.load();
-    // 从本地存储加载用户设置
-    _settings = await Settings.load();
+    // 并行加载数据
+    final wordsFuture = WordStorage.loadWords();
+    final progressFuture = StudyProgress.load();
+    final settingsFuture = Settings.load();
+    final currentWordListFuture = WordListStorage.getCurrentWordList();
+
+    final results = await Future.wait([
+      wordsFuture,
+      progressFuture,
+      settingsFuture,
+      currentWordListFuture,
+    ]);
+    _words = results[0] as List<Word>;
+    _progress = results[1] as StudyProgress;
+    _settings = results[2] as Settings;
+    _currentWordList = results[3] as WordList;
+
+    // 过滤出当前单词表中的单词
+    _filteredWords = _words
+        .where((word) => _currentWordList.wordIds.contains(word.id))
+        .toList();
+
     // 生成测试单词列表
     _generateTestWords();
 
@@ -185,11 +212,11 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
 
   /// 生成测试单词列表
   ///
-  /// 从所有单词中随机选择10个作为测试单词
+  /// 从当前单词表中随机选择10个作为测试单词
   void _generateTestWords() {
     _testWords = [];
-    // 创建单词列表的副本，避免修改原始列表
-    final availableWords = List.from(_words);
+    // 创建过滤后的单词列表的副本，避免修改原始列表
+    final availableWords = List.from(_filteredWords);
 
     // 随机选择10个单词，直到选满或没有更多单词
     while (_testWords.length < 10 && availableWords.isNotEmpty) {
@@ -229,7 +256,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 提交答案
   ///
   /// 检查用户答案是否正确，更新测试结果，并移动到下一个测试题
-  void _submitAnswer() {
+  void _submitAnswer() async {
     // 如果没有选择答案，直接返回
     if (_selectedAnswer.value == null) return;
 
@@ -267,8 +294,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         _currentIndex++;
         _selectedAnswer.value = null; // 清空选中答案
       } else {
-        // 测试完成，显示结果
-        _showResult = true;
+        // 测试完成，生成测试记录
+        _generateTestRecord();
       }
     });
 
@@ -285,6 +312,83 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _progress.updateWordsStudied(1, isMastered);
   }
 
+  /// 生成测试记录
+  void _generateTestRecord() async {
+    // 停止学习时长计时器并计算测试时长
+    _stopStudyTimer();
+    final testDuration = _sessionStudyTime;
+
+    // 计算测试总题数和得分
+    final total = _correctCount + _wrongCount;
+    final score = total > 0 ? (_correctCount / total * 100).toInt() : 0;
+
+    // 生成题目记录
+    final questions = <TestQuestion>[];
+    for (int i = 0; i < _testWords.length; i++) {
+      final word = _testWords[i];
+      // 这里简化处理，实际应该记录每个题目的用户答案
+      // 由于当前测试页面没有存储每个题目的用户答案，这里仅作为示例
+      TestQuestion question;
+      if (_testMode == TestMode.multipleChoice) {
+        // 选择题
+        final options = _generateOptions(word.meaning);
+        question = TestQuestion(
+          id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
+          mode: TestMode.multipleChoice,
+          question: word.word,
+          userAnswer: i == _currentIndex ? _selectedAnswer.value : null,
+          correctAnswer: word.meaning,
+          status: i == _currentIndex
+              ? (_selectedAnswer.value == word.meaning
+                    ? QuestionStatus.correct
+                    : QuestionStatus.wrong)
+              : QuestionStatus.unattempted,
+          options: options,
+        );
+      } else {
+        // 填空题
+        question = TestQuestion(
+          id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
+          mode: TestMode.blankFill,
+          question: word.meaning,
+          userAnswer: i == _currentIndex ? _selectedAnswer.value : null,
+          correctAnswer: word.word,
+          status: i == _currentIndex
+              ? (_selectedAnswer.value?.trim().toLowerCase() ==
+                        word.word.toLowerCase()
+                    ? QuestionStatus.correct
+                    : QuestionStatus.wrong)
+              : QuestionStatus.unattempted,
+        );
+      }
+      questions.add(question);
+    }
+
+    // 生成测试记录
+    final testRecord = TestRecord(
+      testTime: DateTime.now(),
+      testDuration: testDuration,
+      totalQuestions: total,
+      correctQuestions: _correctCount,
+      score: score,
+      testMode: _testMode,
+      testWordCount: _testWords.length,
+      testRange: '随机测试',
+      questions: questions,
+    );
+
+    // 保存测试记录
+    await TestRecordStorage.addRecord(testRecord);
+
+    // 跳转到测试结果页面
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TestResultPage(testRecord: testRecord),
+      ),
+    );
+  }
+
   /// 生成选择题选项
   ///
   /// 为选择题生成4个选项，包含1个正确答案和3个错误答案
@@ -294,7 +398,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 返回：包含4个选项的列表，已打乱顺序
   List<String> _generateOptions(String correctAnswer) {
     final options = [correctAnswer]; // 先添加正确答案
-    final availableWords = List.from(_words); // 创建单词列表副本
+    final availableWords = List.from(_filteredWords); // 从当前单词表中选择选项
 
     // 随机选择3个错误选项
     while (options.length < 4 && availableWords.isNotEmpty) {
@@ -306,6 +410,20 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       // 确保错误选项不与正确答案重复，且不重复添加
       if (word.meaning != correctAnswer && !options.contains(word.meaning)) {
         options.add(word.meaning);
+      }
+    }
+
+    // 如果当前单词表中的单词不够，从所有单词中补充
+    if (options.length < 4) {
+      final allAvailableWords = List.from(_words);
+      while (options.length < 4 && allAvailableWords.isNotEmpty) {
+        final randomIndex =
+            DateTime.now().millisecondsSinceEpoch % allAvailableWords.length;
+        final word = allAvailableWords.removeAt(randomIndex);
+
+        if (word.meaning != correctAnswer && !options.contains(word.meaning)) {
+          options.add(word.meaning);
+        }
       }
     }
 
@@ -332,6 +450,33 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
             color: Theme.of(context).textTheme.bodyLarge?.color,
             fontWeight: FontWeight.bold,
           ),
+        ),
+      );
+    }
+
+    // 当前单词表中没有单词时显示提示
+    if (_filteredWords.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '当前单词表中没有单词',
+              style: TextStyle(
+                fontSize: 22,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              '请先添加单词到 "${_currentWordList.name}"',
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -999,12 +1144,4 @@ class __AnimatedPlayButtonState extends State<_AnimatedPlayButton> {
       ),
     );
   }
-}
-
-/// 测试模式枚举
-///
-/// 定义了两种测试模式：
-enum TestMode {
-  multipleChoice, // 选择题模式
-  blankFill, // 填空题模式
 }

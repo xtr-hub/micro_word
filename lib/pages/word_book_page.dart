@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../models/word_storage.dart';
+import '../models/word_list.dart';
+import '../models/word_list_storage.dart';
 
 // 单词本页面
 class WordBookPage extends StatefulWidget {
@@ -13,6 +15,10 @@ class _WordBookPageState extends State<WordBookPage> {
   late List<Word> _words;
   // 过滤后的单词列表
   late List<Word> _filteredWords;
+  // 单词表列表
+  late List<WordList> _wordLists;
+  // 当前单词表
+  late WordList _currentWordList;
   // 搜索关键词
   String _searchKeyword = '';
   // 学习状态过滤
@@ -31,15 +37,34 @@ class _WordBookPageState extends State<WordBookPage> {
     _loadData();
   }
 
-  // 加载单词数据
+  // 加载单词和单词表数据
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
     });
 
-    _words = await WordStorage.loadWords();
-    _filteredWords = List.from(_words);
-    _sortWords();
+    // 并行加载单词和单词表数据
+    final wordsFuture = WordStorage.loadWords();
+    final wordListsFuture = WordListStorage.loadWordLists();
+
+    final results = await Future.wait([wordsFuture, wordListsFuture]);
+    _words = results[0] as List<Word>;
+    _wordLists = results[1] as List<WordList>;
+
+    // 找到当前单词表
+    _currentWordList = _wordLists.firstWhere(
+      (wordList) => wordList.isCurrent,
+      orElse: () => _wordLists.isNotEmpty
+          ? _wordLists[0]
+          : WordList(
+              id: DateTime.now().millisecondsSinceEpoch,
+              name: '默认单词表',
+              isCurrent: true,
+            ),
+    );
+
+    // 应用过滤条件
+    _applyFilters();
 
     setState(() {
       _isLoading = false;
@@ -57,6 +82,9 @@ class _WordBookPageState extends State<WordBookPage> {
   // 应用过滤条件
   void _applyFilters() {
     _filteredWords = _words.where((word) {
+      // 检查单词是否在当前单词表中
+      final inCurrentWordList = _currentWordList.wordIds.contains(word.id);
+
       final matchesSearch =
           word.word.toLowerCase().contains(_searchKeyword.toLowerCase()) ||
           word.meaning.toLowerCase().contains(_searchKeyword.toLowerCase());
@@ -66,7 +94,10 @@ class _WordBookPageState extends State<WordBookPage> {
 
       final matchesFavorite = !_showOnlyFavorites || word.isFavorite;
 
-      return matchesSearch && matchesStatus && matchesFavorite;
+      return inCurrentWordList &&
+          matchesSearch &&
+          matchesStatus &&
+          matchesFavorite;
     }).toList();
 
     _sortWords();
@@ -89,6 +120,208 @@ class _WordBookPageState extends State<WordBookPage> {
         );
         break;
     }
+  }
+
+  // 切换单词表
+  Future<void> _switchWordList(WordList wordList) async {
+    // 更新单词表的当前状态
+    for (final wl in _wordLists) {
+      wl.isCurrent = wl.id == wordList.id;
+    }
+
+    // 保存更新后的单词表列表
+    await WordListStorage.saveWordLists(_wordLists);
+
+    // 更新当前单词表并重新加载数据
+    setState(() {
+      _currentWordList = wordList;
+    });
+
+    // 重新应用过滤条件
+    _applyFilters();
+  }
+
+  // 创建新单词表
+  Future<void> _createWordList() async {
+    // 显示输入对话框，让用户输入新单词表的名称
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String? name;
+        return AlertDialog(
+          title: Text('创建新单词表'),
+          content: TextField(
+            onChanged: (value) => name = value,
+            decoration: InputDecoration(labelText: '单词表名称'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, name),
+              child: Text('创建'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // 如果用户输入了名称且名称不为空
+    if (newName != null && newName.trim().isNotEmpty) {
+      // 创建新单词表
+      final newWordList = WordList(
+        id: DateTime.now().millisecondsSinceEpoch,
+        name: newName.trim(),
+        isCurrent: true, // 新单词表设为当前学习内容
+      );
+
+      // 添加新单词表
+      await WordListStorage.addWordList(newWordList);
+
+      // 重新加载数据
+      await _loadData();
+    }
+  }
+
+  // 编辑单词表
+  Future<void> _editWordList(WordList wordList) async {
+    // 显示输入对话框，让用户输入新的单词表名称
+    final newName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        String? name = wordList.name;
+        return AlertDialog(
+          title: Text('编辑单词表'),
+          content: TextField(
+            onChanged: (value) => name = value,
+            decoration: InputDecoration(labelText: '单词表名称'),
+            controller: TextEditingController(text: wordList.name),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, name),
+              child: Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // 如果用户输入了名称且名称不为空
+    if (newName != null && newName.trim().isNotEmpty) {
+      // 创建更新后的单词表
+      final updatedWordList = WordList(
+        id: wordList.id,
+        name: newName.trim(),
+        createdAt: wordList.createdAt,
+        wordIds: wordList.wordIds,
+        isCurrent: wordList.isCurrent,
+      );
+
+      // 更新单词表
+      await WordListStorage.updateWordList(updatedWordList);
+
+      // 重新加载数据
+      await _loadData();
+    }
+  }
+
+  // 删除单词表
+  Future<void> _deleteWordList(WordList wordList) async {
+    // 显示确认对话框
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('删除单词表'),
+          content: Text('确定要删除单词表 "${wordList.name}" 吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('删除'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // 如果用户确认删除
+    if (confirm == true) {
+      // 删除单词表
+      await WordListStorage.deleteWordList(wordList.id);
+
+      // 重新加载数据
+      await _loadData();
+    }
+  }
+
+  // 向单词表添加单词
+  Future<void> _addWordToWordList(Word word) async {
+    // 显示单词表选择对话框
+    final selectedWordList = await showDialog<WordList>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('添加到单词表'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _wordLists.length,
+              itemBuilder: (context, index) {
+                final wl = _wordLists[index];
+                final isAdded = wl.wordIds.contains(word.id);
+                return ListTile(
+                  title: Text(wl.name),
+                  trailing: isAdded ? Icon(Icons.check) : null,
+                  onTap: () => Navigator.pop(context, wl),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('取消'),
+            ),
+          ],
+        );
+      },
+    );
+
+    // 如果用户选择了单词表
+    if (selectedWordList != null) {
+      // 向单词表添加单词
+      selectedWordList.addWord(word.id);
+
+      // 更新单词表
+      await WordListStorage.updateWordList(selectedWordList);
+
+      // 重新加载数据
+      await _loadData();
+    }
+  }
+
+  // 从单词表移除单词
+  Future<void> _removeWordFromWordList(Word word) async {
+    // 从当前单词表移除单词
+    _currentWordList.removeWord(word.id);
+
+    // 更新单词表
+    await WordListStorage.updateWordList(_currentWordList);
+
+    // 重新加载数据
+    await _loadData();
   }
 
   // 设置学习状态过滤
@@ -301,7 +534,14 @@ class _WordBookPageState extends State<WordBookPage> {
                 // 先关闭对话框，再执行异步操作
                 Navigator.pop(dialogContext);
 
+                // 添加单词到存储
                 await WordStorage.addWord(newWord);
+
+                // 将新单词添加到当前单词表
+                _currentWordList.addWord(newWord.id);
+                await WordListStorage.updateWordList(_currentWordList);
+
+                // 重新加载数据
                 _loadData();
               },
               child: const Text('添加'),
@@ -326,6 +566,69 @@ class _WordBookPageState extends State<WordBookPage> {
         children: [
           Column(
             children: [
+              // 单词表管理
+              Padding(
+                padding: const EdgeInsets.all(15.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Color.fromRGBO(255, 255, 255, 0.9),
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color.fromRGBO(128, 128, 128, 0.2),
+                        spreadRadius: 2,
+                        blurRadius: 5,
+                        offset: Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 15),
+                    child: DropdownButton<WordList>(
+                      value: _currentWordList,
+                      hint: Text('选择单词表'),
+                      onChanged: (selectedWordList) {
+                        if (selectedWordList != null) {
+                          _switchWordList(selectedWordList);
+                        } else {
+                          // 创建新单词表
+                          _createWordList();
+                        }
+                      },
+                      items: [
+                        ..._wordLists.map((wordList) {
+                          return DropdownMenuItem(
+                            value: wordList,
+                            child: Text(wordList.name),
+                          );
+                        }),
+                        // 添加创建新单词表的选项
+                        DropdownMenuItem(value: null, child: Text('+ 创建新单词表')),
+                      ],
+                      dropdownColor:
+                          Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey.shade800
+                          : Colors.white,
+                      icon: Icon(
+                        Icons.arrow_drop_down,
+                        color: Colors.blue.shade700,
+                      ),
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Theme.of(context).textTheme.bodyLarge?.color,
+                      ),
+                      isExpanded: true,
+                      underline: Container(),
+                      onTap: () {
+                        // 这里可以添加一些逻辑，比如刷新单词表列表
+                      },
+                    ),
+                  ),
+                ),
+              ),
+
               // 搜索栏
               Padding(
                 padding: const EdgeInsets.all(15.0),
@@ -601,6 +904,48 @@ class _WordBookPageState extends State<WordBookPage> {
                               ),
                               onPressed: () => _toggleFavorite(word),
                               tooltip: word.isFavorite ? '取消收藏' : '收藏单词',
+                            ),
+                            SizedBox(width: 10),
+                            // 单词表操作按钮
+                            IconButton(
+                              icon: Icon(
+                                Icons.list,
+                                color: Colors.blue.shade700,
+                                size: 24,
+                              ),
+                              onPressed: () {
+                                // 显示单词表操作菜单
+                                showModalBottomSheet(
+                                  context: context,
+                                  builder: (context) {
+                                    return Container(
+                                      padding: EdgeInsets.all(20),
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ListTile(
+                                            leading: Icon(Icons.add),
+                                            title: Text('添加到其他单词表'),
+                                            onTap: () {
+                                              Navigator.pop(context);
+                                              _addWordToWordList(word);
+                                            },
+                                          ),
+                                          ListTile(
+                                            leading: Icon(Icons.remove),
+                                            title: Text('从当前单词表移除'),
+                                            onTap: () {
+                                              Navigator.pop(context);
+                                              _removeWordFromWordList(word);
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              tooltip: '单词表操作',
                             ),
                             SizedBox(width: 10),
                             // 学习状态

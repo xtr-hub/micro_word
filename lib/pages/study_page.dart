@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../models/word_storage.dart';
+import '../models/word_list.dart';
+import '../models/word_list_storage.dart';
 import '../models/study_progress.dart';
 import '../models/settings.dart';
 import '../services/audio_service.dart';
@@ -23,10 +25,18 @@ class _StudyPageState extends State<StudyPage>
     with SingleTickerProviderStateMixin {
   // 单词数据
   late List<Word> _words;
-  int _currentIndex = 0;
+  late WordList _currentWordList;
+  late List<Word> _filteredWords;
+  late List<List<Word>> _wordGroups; // 分组后的单词列表
+  int _currentGroup = 0; // 当前分组索引
+  int _currentIndexInGroup = 0; // 当前在分组中的索引
   bool _isLoading = true;
   bool _showAnswer = false;
   bool _isCorrect = false;
+
+  // 分组学习统计
+  late DateTime _groupStartTime; // 当前分组的开始时间
+  int _groupCorrectCount = 0; // 当前分组的正确答案数量
 
   // 学习相关
   late StudyProgress _progress;
@@ -37,9 +47,15 @@ class _StudyPageState extends State<StudyPage>
   int _selectedOption = -1;
   int _correctAnswerIndex = 0;
 
+  // 获取当前单词
+  Word get _currentWord {
+    return _wordGroups[_currentGroup][_currentIndexInGroup];
+  }
+
   // 动画相关
   late AnimationController _animationController;
   late Animation<double> _heightAnimation;
+  late Animation<double> _exampleOpacityAnimation;
   bool _isAnimating = false;
 
   @override
@@ -57,6 +73,14 @@ class _StudyPageState extends State<StudyPage>
     _heightAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
+
+    // 初始化例句透明度动画
+    _exampleOpacityAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _animationController,
+        curve: Interval(0.3, 1.0, curve: Curves.easeInOut),
+      ),
+    );
   }
 
   // 加载数据
@@ -65,12 +89,33 @@ class _StudyPageState extends State<StudyPage>
       _isLoading = true;
     });
 
-    _words = await WordStorage.loadWords();
-    _progress = await StudyProgress.load();
-    _settings = await Settings.load();
+    // 并行加载数据
+    final wordsFuture = WordStorage.loadWords();
+    final progressFuture = StudyProgress.load();
+    final settingsFuture = Settings.load();
+    final currentWordListFuture = WordListStorage.getCurrentWordList();
+
+    final results = await Future.wait([
+      wordsFuture,
+      progressFuture,
+      settingsFuture,
+      currentWordListFuture,
+    ]);
+    _words = results[0] as List<Word>;
+    _progress = results[1] as StudyProgress;
+    _settings = results[2] as Settings;
+    _currentWordList = results[3] as WordList;
+
+    // 过滤出当前单词表中的单词
+    _filteredWords = _words
+        .where((word) => _currentWordList.wordIds.contains(word.id))
+        .toList();
+
+    // 如果当前单词表中没有单词，使用所有单词
+    final wordsToUse = _filteredWords.isNotEmpty ? _filteredWords : _words;
 
     // 如果没有单词，使用模拟数据
-    if (_words.isEmpty) {
+    if (wordsToUse.isEmpty) {
       _words = [
         Word(
           id: 1,
@@ -79,8 +124,55 @@ class _StudyPageState extends State<StudyPage>
           meaning: 'adj. 好斗的，有侵略性的；进取的',
           example: 'He has an aggressive personality.',
         ),
+        Word(
+          id: 2,
+          word: 'beneficial',
+          phonetic: '/ˌbenɪˈfɪʃl/',
+          meaning: 'adj. 有益的，有利的',
+          example: 'This medicine has a beneficial effect on the patient.',
+        ),
+        Word(
+          id: 3,
+          word: 'confident',
+          phonetic: '/ˈkɒnfɪdənt/',
+          meaning: 'adj. 自信的，确信的',
+          example: 'She is confident of winning the race.',
+        ),
+        Word(
+          id: 4,
+          word: 'dependent',
+          phonetic: '/dɪˈpendənt/',
+          meaning: 'adj. 依赖的，依靠的',
+          example: 'The child is dependent on his parents.',
+        ),
+        Word(
+          id: 5,
+          word: 'efficient',
+          phonetic: '/ɪˈfɪʃnt/',
+          meaning: 'adj. 效率高的，有能力的',
+          example: 'The new machine is more efficient than the old one.',
+        ),
       ];
+      _filteredWords = _words;
     }
+
+    // 实现分组逻辑
+    _wordGroups = [];
+    int groupSize = _settings.studyGroupSize;
+    final targetWords = _filteredWords.isNotEmpty ? _filteredWords : _words;
+    for (int i = 0; i < targetWords.length; i += groupSize) {
+      int end = i + groupSize;
+      if (end > targetWords.length) {
+        end = targetWords.length;
+      }
+      _wordGroups.add(targetWords.sublist(i, end));
+    }
+
+    // 初始化分组索引
+    _currentGroup = 0;
+    _currentIndexInGroup = 0;
+    _groupStartTime = DateTime.now();
+    _groupCorrectCount = 0;
 
     // 初始化释义选项
     _initMeaningOptions();
@@ -90,8 +182,10 @@ class _StudyPageState extends State<StudyPage>
     });
 
     // 自动播放发音
-    if (_settings.autoPlayPronunciation) {
-      _speakWord(_words[_currentIndex].word);
+    if (_settings.autoPlayPronunciation &&
+        _wordGroups.isNotEmpty &&
+        _wordGroups[_currentGroup].isNotEmpty) {
+      _speakWord(_currentWord.word);
     }
   }
 
@@ -102,18 +196,23 @@ class _StudyPageState extends State<StudyPage>
     _meaningOptions = [];
 
     // 添加当前单词的正确释义
-    final currentWord = _words[_currentIndex];
+    final currentWord = _currentWord;
     _meaningOptions.add(currentWord.meaning);
 
-    // 从其他单词中添加干扰项
-    final otherWords = _words
+    // 从当前单词表的其他单词中添加干扰项
+    final otherWords = _filteredWords.isNotEmpty ? _filteredWords : _words;
+    final availableDistractors = otherWords
         .where((word) => word.id != currentWord.id)
         .toList();
 
     // 随机选择几个干扰项（最多3个）
     final distractorCount = 3;
-    for (int i = 0; i < distractorCount && i < otherWords.length; i++) {
-      _meaningOptions.add(otherWords[i].meaning);
+    for (
+      int i = 0;
+      i < distractorCount && i < availableDistractors.length;
+      i++
+    ) {
+      _meaningOptions.add(availableDistractors[i].meaning);
     }
 
     // 如果干扰项不足，添加一些默认干扰项
@@ -152,9 +251,10 @@ class _StudyPageState extends State<StudyPage>
 
     // 更新单词学习状态
     if (_isCorrect) {
-      _words[_currentIndex].updateStatus(StudyStatus.familiar);
+      _currentWord.updateStatus(StudyStatus.familiar);
+      _groupCorrectCount++;
     } else {
-      _words[_currentIndex].updateStatus(StudyStatus.learning);
+      _currentWord.updateStatus(StudyStatus.learning);
     }
   }
 
@@ -165,21 +265,188 @@ class _StudyPageState extends State<StudyPage>
     await WordStorage.saveWords(_words);
     await _progress.save();
 
-    // 判断是否完成了一组学习
-    if (_currentIndex == _words.length - 1) {
-      // 完成了所有单词的学习，显示总结
-      _showStudySummary();
+    // 检查是否达成今日学习任务
+    bool isTaskCompleted = _progress.todayWordsStudied >= _progress.dailyGoal;
+
+    // 判断是否完成了当前分组
+    if (_currentIndexInGroup == _wordGroups[_currentGroup].length - 1) {
+      // 检查是否完成了所有分组
+      bool isAllGroupsCompleted = _currentGroup == _wordGroups.length - 1;
+
+      // 如果达成今日学习任务或完成了所有分组，优先显示学习完成界面
+      if (isTaskCompleted || isAllGroupsCompleted) {
+        _showStudySummary();
+      } else {
+        // 否则显示分组完成提示
+        _showGroupCompletion();
+      }
     } else {
-      // 切换到下一个单词
+      // 切换到当前分组的下一个单词
       setState(() {
-        _currentIndex = _currentIndex + 1;
+        _currentIndexInGroup = _currentIndexInGroup + 1;
         _initMeaningOptions();
         _isAnimating = false;
       });
 
       // 自动播放发音
       if (_settings.autoPlayPronunciation) {
-        _speakWord(_words[_currentIndex].word);
+        _speakWord(_currentWord.word);
+      }
+    }
+  }
+
+  // 显示分组完成提示
+  void _showGroupCompletion() {
+    // 计算分组学习统计数据
+    int groupSize = _wordGroups[_currentGroup].length;
+    double accuracy = groupSize > 0
+        ? (_groupCorrectCount / groupSize) * 100
+        : 0;
+    int groupTime = DateTime.now().difference(_groupStartTime).inSeconds;
+
+    // 显示分组完成提示对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Center(
+          child: Text(
+            '分组完成',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.blue,
+            ),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(height: 20),
+            // 分组信息
+            Container(
+              padding: EdgeInsets.all(15),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    '第 ${_currentGroup + 1} 组学习已完成！',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue,
+                    ),
+                  ),
+                  SizedBox(height: 15),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildSummaryItem(
+                        '正确率',
+                        '${accuracy.toStringAsFixed(1)}%',
+                      ),
+                      _buildSummaryItem('用时', '${groupTime}秒'),
+                      _buildSummaryItem(
+                        '正确',
+                        '$_groupCorrectCount / $groupSize',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 20),
+            // 学习建议
+            Text(
+              '继续保持，加油！',
+              style: TextStyle(fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actions: [
+          // 使用Row和Expanded实现按钮对称分布
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              // 返回主页
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).pop();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      '返回主页',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+              // 继续下一组
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      _nextGroup();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text(
+                      '继续下一组',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 10),
+        ],
+      ),
+    );
+  }
+
+  // 进入下一组学习
+  void _nextGroup() {
+    // 判断是否完成了所有分组
+    if (_currentGroup == _wordGroups.length - 1) {
+      // 完成了所有分组，显示学习总结
+      _showStudySummary();
+    } else {
+      // 进入下一组
+      setState(() {
+        _currentGroup = _currentGroup + 1;
+        _currentIndexInGroup = 0;
+        _groupStartTime = DateTime.now();
+        _groupCorrectCount = 0;
+        _initMeaningOptions();
+        _isAnimating = false;
+      });
+
+      // 自动播放发音
+      if (_settings.autoPlayPronunciation) {
+        _speakWord(_currentWord.word);
       }
     }
   }
@@ -227,7 +494,10 @@ class _StudyPageState extends State<StudyPage>
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       _buildSummaryItem('总单词数', _words.length.toString()),
-                      _buildSummaryItem('学习完成', '${_currentIndex + 1}'),
+                      _buildSummaryItem(
+                        '学习完成',
+                        '${_progress.todayWordsStudied}',
+                      ),
                       _buildSummaryItem(
                         '今日目标',
                         '${_progress.todayWordsStudied}/${_progress.dailyGoal}',
@@ -297,12 +567,15 @@ class _StudyPageState extends State<StudyPage>
                       Navigator.pop(context); // 关闭对话框
                       // 重新开始学习
                       setState(() {
-                        _currentIndex = 0;
+                        _currentGroup = 0;
+                        _currentIndexInGroup = 0;
+                        _groupStartTime = DateTime.now();
+                        _groupCorrectCount = 0;
                         _initMeaningOptions();
                       });
                       // 自动播放发音
                       if (_settings.autoPlayPronunciation) {
-                        _speakWord(_words[_currentIndex].word);
+                        _speakWord(_currentWord.word);
                       }
                     },
                     child: Text(
@@ -347,7 +620,61 @@ class _StudyPageState extends State<StudyPage>
       );
     }
 
-    final currentWord = _words[_currentIndex];
+    // 检查当前单词表是否为空
+    if (_wordGroups.isEmpty ||
+        (_wordGroups.length == 1 && _wordGroups[0].isEmpty)) {
+      return Scaffold(
+        body: Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.book, size: 80, color: Colors.grey.shade300),
+                  SizedBox(height: 20),
+                  Text(
+                    '当前单词表中没有单词',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    '请先添加单词到 "${_currentWordList.name}"',
+                    style: TextStyle(fontSize: 16, color: Colors.grey.shade500),
+                  ),
+                  SizedBox(height: 30),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: Text(
+                      '返回单词本',
+                      style: TextStyle(fontSize: 16, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    // 不再需要 currentWord 变量，直接使用 _currentWord getter 方法
 
     return Scaffold(
       // 使用主题背景色，移除黄色渐变
@@ -372,7 +699,7 @@ class _StudyPageState extends State<StudyPage>
 
                     // 进度指示器
                     Text(
-                      '${_currentIndex + 1}/${_words.length}',
+                      '第 ${_currentGroup + 1} 组 ${_currentIndexInGroup + 1}/${_wordGroups[_currentGroup].length}',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey.shade600,
@@ -403,9 +730,9 @@ class _StudyPageState extends State<StudyPage>
                               children: [
                                 // 单词
                                 GestureDetector(
-                                  onTap: () => _speakWord(currentWord.word),
+                                  onTap: () => _speakWord(_currentWord.word),
                                   child: Text(
-                                    currentWord.word,
+                                    _currentWord.word,
                                     style: TextStyle(
                                       fontSize: 48,
                                       fontWeight: FontWeight.bold,
@@ -418,7 +745,7 @@ class _StudyPageState extends State<StudyPage>
 
                                 // 音标
                                 Text(
-                                  currentWord.phonetic ?? '',
+                                  _currentWord.phonetic ?? '',
                                   style: TextStyle(
                                     fontSize: 20,
                                     color: Colors.grey.shade600,
@@ -431,7 +758,8 @@ class _StudyPageState extends State<StudyPage>
                                 // 发音按钮
                                 IconButton(
                                   icon: Icon(Icons.volume_up, size: 32),
-                                  onPressed: () => _speakWord(currentWord.word),
+                                  onPressed: () =>
+                                      _speakWord(_currentWord.word),
                                   color: Colors.orange,
                                 ),
 
@@ -524,8 +852,8 @@ class _StudyPageState extends State<StudyPage>
                       child: GestureDetector(
                         onTap: () {
                           setState(() {
-                            bool wasFavorite = _words[_currentIndex].isFavorite;
-                            _words[_currentIndex].toggleFavorite();
+                            bool wasFavorite = _currentWord.isFavorite;
+                            _currentWord.toggleFavorite();
                             WordStorage.saveWords(_words);
 
                             // 显示收藏状态变化的提示
@@ -536,14 +864,14 @@ class _StudyPageState extends State<StudyPage>
                           height: 55,
                           margin: EdgeInsets.symmetric(horizontal: 5),
                           decoration: BoxDecoration(
-                            color: _words[_currentIndex].isFavorite
+                            color: _currentWord.isFavorite
                                 ? Colors.purple
                                 : Colors.grey.shade400,
                             borderRadius: BorderRadius.circular(28),
                             boxShadow: [
                               BoxShadow(
                                 color:
-                                    (_words[_currentIndex].isFavorite
+                                    (_currentWord.isFavorite
                                             ? Colors.purple
                                             : Colors.grey.shade400)
                                         .withOpacity(0.3),
@@ -563,10 +891,8 @@ class _StudyPageState extends State<StudyPage>
                                 );
                               },
                               child: Icon(
-                                key: ValueKey<bool>(
-                                  _words[_currentIndex].isFavorite,
-                                ),
-                                _words[_currentIndex].isFavorite
+                                key: ValueKey<bool>(_currentWord.isFavorite),
+                                _currentWord.isFavorite
                                     ? Icons.favorite
                                     : Icons.favorite_border,
                                 size: 24,
@@ -672,13 +998,10 @@ class _StudyPageState extends State<StudyPage>
                   // 例句显示区域
                   if (isCorrect &&
                       _heightAnimation.value > 0.3 &&
-                      _words[_currentIndex].example != null &&
-                      _words[_currentIndex].example!.isNotEmpty)
+                      _currentWord.example != null &&
+                      _currentWord.example!.isNotEmpty)
                     Opacity(
-                      opacity: ((_heightAnimation.value - 0.3) * 1.67).clamp(
-                        0.0,
-                        1.0,
-                      ),
+                      opacity: _exampleOpacityAnimation.value,
                       child: Container(
                         margin: EdgeInsets.only(top: 15),
                         padding: EdgeInsets.symmetric(
@@ -702,7 +1025,7 @@ class _StudyPageState extends State<StudyPage>
                             ),
                             SizedBox(height: 8),
                             Text(
-                              _words[_currentIndex].example!,
+                              _currentWord.example!,
                               style: TextStyle(
                                 fontSize: 16,
                                 color: Colors.black87,
@@ -836,7 +1159,7 @@ class _StudyPageState extends State<StudyPage>
               // 按钮2
               _buildMenuButton(
                 '再听一遍发音',
-                () => _speakWord(_words[_currentIndex].word),
+                () => _speakWord(_currentWord.word),
                 Colors.green,
               ),
 
@@ -844,7 +1167,7 @@ class _StudyPageState extends State<StudyPage>
 
               // 按钮3
               _buildMenuButton('收藏该单词', () {
-                _words[_currentIndex].toggleFavorite();
+                _currentWord.toggleFavorite();
                 WordStorage.saveWords(_words);
                 Navigator.pop(context);
               }, Colors.purple),

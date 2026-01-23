@@ -48,11 +48,15 @@ class Settings {
   bool autoPlayPronunciation;
   bool showExampleByDefault;
   PronunciationType pronunciationType;
+  int studyGroupSize; // 学习分组大小
+  int reviewGroupSize; // 复习分组大小
 
   Settings({
     this.autoPlayPronunciation = true,
     this.showExampleByDefault = false,
     this.pronunciationType = PronunciationType.american,
+    this.studyGroupSize = 5, // 默认学习分组大小为5
+    this.reviewGroupSize = 20, // 默认复习分组大小为20
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -62,6 +66,8 @@ class Settings {
       pronunciationType: stringToPronunciationType(
         json['pronunciationType'] ?? 'american',
       ),
+      studyGroupSize: json['studyGroupSize'] ?? 5,
+      reviewGroupSize: json['reviewGroupSize'] ?? 20,
     );
   }
 
@@ -70,6 +76,8 @@ class Settings {
       'autoPlayPronunciation': autoPlayPronunciation,
       'showExampleByDefault': showExampleByDefault,
       'pronunciationType': pronunciationTypeToString(pronunciationType),
+      'studyGroupSize': studyGroupSize,
+      'reviewGroupSize': reviewGroupSize,
     };
   }
 

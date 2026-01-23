@@ -10,6 +10,12 @@ import 'package:path_provider/path_provider.dart';
 /// Word模型类，定义了单词的数据结构
 import 'word.dart';
 
+/// WordList模型类，定义了单词表的数据结构
+import 'word_list.dart';
+
+/// 单词表存储服务类
+import 'word_list_storage.dart';
+
 /// 单词存储服务类
 ///
 /// 功能：
@@ -143,7 +149,49 @@ class WordStorage {
       /// 保存到文件
       await saveWords(defaultWords);
 
+      /// 提取默认单词的ID列表
+      final defaultWordIds = defaultWords.map((word) => word.id).toList();
+
+      /// 加载所有单词表
+      final wordLists = await WordListStorage.loadWordLists();
+
+      /// 查找或创建默认单词表
+      WordList? defaultWordList;
+
+      /// 尝试查找名为"默认单词表"的单词表
+      defaultWordList = wordLists.firstWhere(
+        (list) => list.name == '默认单词表',
+        orElse: () => WordList(
+          id: DateTime.now().millisecondsSinceEpoch,
+          name: '默认单词表',
+          isCurrent: true,
+          wordIds: defaultWordIds,
+        ),
+      );
+
+      /// 如果默认单词表不存在，添加到列表中
+      if (!wordLists.contains(defaultWordList)) {
+        wordLists.add(defaultWordList);
+      } else {
+        /// 如果默认单词表存在，更新其wordIds列表为所有默认单词的ID
+        defaultWordList.wordIds = defaultWordIds;
+
+        /// 确保默认单词表被设置为当前学习内容
+        defaultWordList.isCurrent = true;
+      }
+
+      /// 确保只有默认单词表被设置为当前学习内容
+      for (final wordList in wordLists) {
+        if (wordList.id != defaultWordList.id) {
+          wordList.isCurrent = false;
+        }
+      }
+
+      /// 保存更新后的单词表列表
+      await WordListStorage.saveWordLists(wordLists);
+
       print('已重置为新的50个默认单词');
+      print('已将所有默认单词添加到默认单词表中');
       return defaultWords;
     } catch (e) {
       /// 如果重置失败，打印错误信息

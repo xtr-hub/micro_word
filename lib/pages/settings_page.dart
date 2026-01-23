@@ -15,7 +15,12 @@ import '../providers/theme_provider.dart'; // 主题状态管理
 /// - 学习统计数据
 /// - 学习数据分析（饼图和柱状图）
 class SettingsPage extends StatefulWidget {
+  /// 设置保存成功回调函数
+  final Function? onSettingsSaved;
+
   /// 创建页面状态对象
+  const SettingsPage({Key? key, this.onSettingsSaved}) : super(key: key);
+
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
@@ -45,6 +50,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 当前发音类型
   PronunciationType _pronunciationType = PronunciationType.american;
+
+  /// 学习分组大小
+  int _studyGroupSize = 5;
+
+  /// 复习分组大小
+  int _reviewGroupSize = 20;
 
   /// 数据加载状态
   bool _isLoading = true;
@@ -86,6 +97,8 @@ class _SettingsPageState extends State<SettingsPage> {
     _autoPlayPronunciation = _settings.autoPlayPronunciation;
     _showExampleByDefault = _settings.showExampleByDefault;
     _pronunciationType = _settings.pronunciationType;
+    _studyGroupSize = _settings.studyGroupSize;
+    _reviewGroupSize = _settings.reviewGroupSize;
 
     setState(() {
       _isLoading = false; // 加载完成，隐藏加载指示器
@@ -120,7 +133,15 @@ class _SettingsPageState extends State<SettingsPage> {
     _progress.dailyReviewGoal = _dailyReviewGoal; // 更新学习进度中的每日复习目标
     _progress.save(); // 保存学习进度
 
+    // 更新分组策略设置
+    _settings.studyGroupSize = _studyGroupSize;
+    _settings.reviewGroupSize = _reviewGroupSize;
     _settings.save(); // 保存用户设置
+
+    // 通知主页更新数据
+    if (widget.onSettingsSaved != null) {
+      widget.onSettingsSaved!();
+    }
 
     // 显示保存成功提示
     ScaffoldMessenger.of(context).showSnackBar(
@@ -523,6 +544,115 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ),
+
+              SizedBox(height: 10),
+
+              // 分组策略设置
+              _buildSettingSection('分组策略', [
+                // 学习分组大小设置
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  title: Text(
+                    '学习分组大小',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$_studyGroupSize个单词/组', // 显示当前学习分组大小
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  ),
+                ),
+                // 数字输入框，用于调整学习分组大小
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: TextEditingController(text: '$_studyGroupSize'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      int? size = int.tryParse(value);
+                      if (size != null && size >= 1 && size <= 50) {
+                        setState(() {
+                          _studyGroupSize = size;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: '每组单词数',
+                      hintText: '1-50',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                // 复习分组大小设置
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  title: Text(
+                    '复习分组大小',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$_reviewGroupSize个单词/组', // 显示当前复习分组大小
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  ),
+                ),
+                // 数字输入框，用于调整复习分组大小
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: TextEditingController(
+                      text: '$_reviewGroupSize',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      int? size = int.tryParse(value);
+                      if (size != null && size >= 1 && size <= 50) {
+                        setState(() {
+                          _reviewGroupSize = size;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: '每组单词数',
+                      hintText: '1-50',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                // 添加垂直间距，确保输入框与组件底部之间有足够的留白空间
+                SizedBox(height: 20),
+              ]),
             ]),
 
             SizedBox(height: 25), // 垂直间距
