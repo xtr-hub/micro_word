@@ -7,6 +7,7 @@ import '../models/word_list_storage.dart';
 import '../models/study_progress.dart';
 import '../models/settings.dart';
 import '../services/audio_service.dart';
+import '../services/progress_persistence_service.dart';
 
 /// 学习页面 - 符合设计图要求
 ///
@@ -46,6 +47,11 @@ class _StudyPageState extends State<StudyPage>
   List<String> _meaningOptions = [];
   int _selectedOption = -1;
   int _correctAnswerIndex = 0;
+
+  // 乱序单词ID顺序
+  List<int>? _shuffledWordIds;
+  // 乱序状态是否已生成
+  bool _isShuffleGenerated = false;
 
   // 获取当前单词
   Word get _currentWord {
@@ -89,27 +95,28 @@ class _StudyPageState extends State<StudyPage>
       _isLoading = true;
     });
 
-    // 并行加载数据
-    final wordsFuture = WordStorage.loadWords();
-    final progressFuture = StudyProgress.load();
-    final settingsFuture = Settings.load();
-    final currentWordListFuture = WordListStorage.getCurrentWordList();
-
-    final results = await Future.wait([
-      wordsFuture,
-      progressFuture,
-      settingsFuture,
-      currentWordListFuture,
-    ]);
-    _words = results[0] as List<Word>;
-    _progress = results[1] as StudyProgress;
-    _settings = results[2] as Settings;
-    _currentWordList = results[3] as WordList;
+    // 使用进度持久化服务加载数据
+    final sessionState = await ProgressPersistenceService.instance
+        .loadSessionState();
+    _words = sessionState['words'] as List<Word>;
+    _progress = sessionState['progress'] as StudyProgress;
+    _settings = await Settings.load();
+    _currentWordList = await WordListStorage.getCurrentWordList();
 
     // 过滤出当前单词表中的单词
     _filteredWords = _words
         .where((word) => _currentWordList.wordIds.contains(word.id))
         .toList();
+
+    // 根据单词表中的顺序排序单词（确保学习界面严格按照单词表顺序）
+    _filteredWords.sort((a, b) {
+      final indexA = _currentWordList.wordIds.indexOf(a.id);
+      final indexB = _currentWordList.wordIds.indexOf(b.id);
+      return indexA.compareTo(indexB);
+    });
+
+    // 根据设置中的排序选项排序单词（仅对非新单词生效）
+    _sortWords();
 
     // 如果当前单词表中没有单词，使用所有单词
     final wordsToUse = _filteredWords.isNotEmpty ? _filteredWords : _words;
@@ -189,6 +196,68 @@ class _StudyPageState extends State<StudyPage>
     }
   }
 
+  // 排序单词
+  void _sortWords() {
+    // 分离新单词和已学习单词
+    final newWords = _filteredWords
+        .where((word) => word.status == StudyStatus.newWord)
+        .toList();
+    final learnedWords = _filteredWords
+        .where((word) => word.status != StudyStatus.newWord)
+        .toList();
+
+    // 新单词严格按照单词表顺序
+    newWords.sort((a, b) {
+      final indexA = _currentWordList.wordIds.indexOf(a.id);
+      final indexB = _currentWordList.wordIds.indexOf(b.id);
+      return indexA.compareTo(indexB);
+    });
+
+    // 已学习单词根据用户设置排序
+    switch (_settings.sortOption) {
+      case SortOption.word:
+        learnedWords.sort((a, b) => a.word.compareTo(b.word));
+        break;
+      case SortOption.lastStudyTime:
+        learnedWords.sort((a, b) => b.lastStudyTime.compareTo(a.lastStudyTime));
+        break;
+      case SortOption.memoryStrength:
+        learnedWords.sort(
+          (a, b) => b.memoryStrength.compareTo(a.memoryStrength),
+        );
+        break;
+      case SortOption.shuffle:
+        _shuffleWords(learnedWords);
+        break;
+    }
+
+    // 合并新单词和已学习单词，新单词在前
+    _filteredWords = [...newWords, ...learnedWords];
+  }
+
+  // 乱序排序单词
+  void _shuffleWords(List<Word> words) {
+    // 如果还没有生成乱序顺序，生成一个
+    if (!_isShuffleGenerated) {
+      // 获取当前单词表中的单词ID
+      final wordIds = words.map((word) => word.id).toList();
+      // 打乱顺序
+      wordIds.shuffle();
+      // 保存乱序顺序
+      _shuffledWordIds = wordIds;
+      _isShuffleGenerated = true;
+    }
+
+    // 如果已经有乱序顺序，根据该顺序排序
+    if (_shuffledWordIds != null) {
+      words.sort((a, b) {
+        final indexA = _shuffledWordIds!.indexOf(a.id);
+        final indexB = _shuffledWordIds!.indexOf(b.id);
+        return indexA.compareTo(indexB);
+      });
+    }
+  }
+
   // 初始化释义选项
   void _initMeaningOptions() {
     // 从单词数据中生成释义选项
@@ -260,10 +329,18 @@ class _StudyPageState extends State<StudyPage>
 
   // 下一个单词
   void _nextWord() async {
+    // 记录学习详细信息
+    _progress.recordStudy(_currentWord.id, _isCorrect, _currentWord.status);
+
     // 保存学习进度
     _progress.updateWordsStudied(1, _isCorrect);
-    await WordStorage.saveWords(_words);
-    await _progress.save();
+    await ProgressPersistenceService.instance.saveProgress(
+      progress: _progress,
+      words: _words,
+      currentWordIndex:
+          _currentGroup * _settings.studyGroupSize + _currentIndexInGroup,
+      currentWordListId: _currentWordList.id.toString(),
+    );
 
     // 检查是否达成今日学习任务
     bool isTaskCompleted = _progress.todayWordsStudied >= _progress.dailyGoal;

@@ -1,4 +1,6 @@
 import 'dart:async'; // 计时器相关库
+import 'dart:io'; // 文件操作库
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
 import '../models/word_storage.dart'; // 单词存储服务
@@ -7,6 +9,7 @@ import '../models/word_list_storage.dart'; // 单词表存储服务
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
 import '../models/test_record.dart'; // 测试记录模型
+import '../models/test_settings.dart'; // 测试设置模型
 import '../services/audio_service.dart'; // 音频播放服务
 import './test_result_page.dart'; // 测试结果页面
 import './test_history_page.dart'; // 测试历史页面
@@ -15,13 +18,30 @@ import './test_history_page.dart'; // 测试历史页面
 ///
 /// 功能：
 /// - 支持两种测试模式：选择题和填空题
-/// - 随机生成10个单词进行测试
+/// - 随机生成指定数量的单词进行测试
 /// - 支持播放单词发音
 /// - 实时统计测试结果
 /// - 测试完成后显示详细结果
 /// - 测试完成后显示详细结果
 /// - 根据测试结果更新单词学习状态
 class TestPage extends StatefulWidget {
+  /// 测试单词数量
+  final int testWordCount;
+
+  /// 选中的单词表
+  final WordList? selectedWordList;
+
+  /// 自定义单词表文件路径
+  final String? customWordListPath;
+
+  /// 构造函数
+  const TestPage({
+    Key? key,
+    this.testWordCount = 10,
+    this.selectedWordList,
+    this.customWordListPath,
+  }) : super(key: key);
+
   /// 创建页面状态对象
   @override
   _TestPageState createState() => _TestPageState();
@@ -51,6 +71,12 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   //String? _selectedAnswer;
   ValueNotifier<String?> _selectedAnswer = ValueNotifier<String?>(null);
 
+  /// 存储每个测试题的用户答案
+  Map<int, String?> _userAnswers = {};
+
+  /// 填空题输入框控制器
+  late TextEditingController _blankFillController;
+
   /// 测试结果统计
   int _correctCount = 0; // 正确数量
   int _wrongCount = 0; // 错误数量
@@ -67,6 +93,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 用户设置对象
   late Settings _settings;
 
+  /// 测试设置对象
+  late TestSettings _testSettings;
+
   /// 学习时长计时器
   Timer? _studyTimer;
 
@@ -82,6 +111,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     super.initState();
     // 注册应用生命周期观察者
     WidgetsBinding.instance.addObserver(this);
+    // 初始化填空题输入框控制器
+    _blankFillController = TextEditingController();
     // 加载单词数据和学习进度
     _loadData();
   }
@@ -164,7 +195,31 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _stopStudyTimer();
     // 移除应用生命周期观察者
     WidgetsBinding.instance.removeObserver(this);
+    // 释放填空题输入框控制器
+    _blankFillController.dispose();
     super.dispose();
+  }
+
+  /// 当widget的参数发生变化时调用
+  @override
+  void didUpdateWidget(TestPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    debugPrint('TestPage: didUpdateWidget被调用');
+    debugPrint(
+      'TestPage: 旧参数 - testWordCount: ${oldWidget.testWordCount}, selectedWordList: ${oldWidget.selectedWordList}, customWordListPath: ${oldWidget.customWordListPath}',
+    );
+    debugPrint(
+      'TestPage: 新参数 - testWordCount: ${widget.testWordCount}, selectedWordList: ${widget.selectedWordList}, customWordListPath: ${widget.customWordListPath}',
+    );
+
+    // 检查widget的参数是否发生变化
+    if (oldWidget.testWordCount != widget.testWordCount ||
+        oldWidget.selectedWordList != widget.selectedWordList ||
+        oldWidget.customWordListPath != widget.customWordListPath) {
+      debugPrint('TestPage: 参数发生变化，重新加载数据');
+      // 参数发生变化，重新加载数据
+      _loadData();
+    }
   }
 
   /// 加载单词数据和学习进度
@@ -180,22 +235,77 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     final progressFuture = StudyProgress.load();
     final settingsFuture = Settings.load();
     final currentWordListFuture = WordListStorage.getCurrentWordList();
+    final wordListsFuture = WordListStorage.loadWordLists();
+
+    // 加载测试设置
+    final testSettingsFuture = TestSettingsStorage.loadTestSettings();
 
     final results = await Future.wait([
       wordsFuture,
       progressFuture,
       settingsFuture,
       currentWordListFuture,
+      wordListsFuture,
+      testSettingsFuture,
     ]);
+
     _words = results[0] as List<Word>;
     _progress = results[1] as StudyProgress;
     _settings = results[2] as Settings;
     _currentWordList = results[3] as WordList;
+    final wordLists = results[4] as List<WordList>;
+    _testSettings = results[5] as TestSettings;
 
-    // 过滤出当前单词表中的单词
-    _filteredWords = _words
-        .where((word) => _currentWordList.wordIds.contains(word.id))
-        .toList();
+    // 根据传入的参数或保存的测试设置加载相应的单词
+    if (widget.customWordListPath != null) {
+      // 从自定义单词表文件加载单词
+      try {
+        final file = File(widget.customWordListPath!);
+        final content = await file.readAsString();
+        final customWords = WordStorage.parseWordsFromJson(content);
+        _filteredWords = customWords;
+      } catch (e) {
+        debugPrint('加载自定义单词表失败: $e');
+        // 如果加载失败，使用默认单词表
+        _filteredWords = _words
+            .where((word) => _currentWordList.wordIds.contains(word.id))
+            .toList();
+      }
+    } else if (widget.selectedWordList != null) {
+      // 从选中的单词表加载单词
+      _filteredWords = _words
+          .where((word) => widget.selectedWordList!.wordIds.contains(word.id))
+          .toList();
+    } else if (_testSettings.customWordListPath != null) {
+      // 从保存的自定义单词表路径加载单词
+      try {
+        final file = File(_testSettings.customWordListPath!);
+        final content = await file.readAsString();
+        final customWords = WordStorage.parseWordsFromJson(content);
+        _filteredWords = customWords;
+      } catch (e) {
+        debugPrint('加载保存的自定义单词表失败: $e');
+        // 如果加载失败，使用默认单词表
+        _filteredWords = _words
+            .where((word) => _currentWordList.wordIds.contains(word.id))
+            .toList();
+      }
+    } else if (_testSettings.selectedWordListId != null &&
+        wordLists.isNotEmpty) {
+      // 从保存的选中单词表加载单词
+      final selectedWordList = wordLists.firstWhere(
+        (list) => list.id == _testSettings.selectedWordListId,
+        orElse: () => _currentWordList,
+      );
+      _filteredWords = _words
+          .where((word) => selectedWordList.wordIds.contains(word.id))
+          .toList();
+    } else {
+      // 从当前单词表加载单词
+      _filteredWords = _words
+          .where((word) => _currentWordList.wordIds.contains(word.id))
+          .toList();
+    }
 
     // 生成测试单词列表
     _generateTestWords();
@@ -212,14 +322,17 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
 
   /// 生成测试单词列表
   ///
-  /// 从当前单词表中随机选择10个作为测试单词
+  /// 从当前单词表中随机选择指定数量的单词作为测试单词
   void _generateTestWords() {
     _testWords = [];
     // 创建过滤后的单词列表的副本，避免修改原始列表
     final availableWords = List.from(_filteredWords);
 
-    // 随机选择10个单词，直到选满或没有更多单词
-    while (_testWords.length < 10 && availableWords.isNotEmpty) {
+    // 确定测试单词数量：优先使用传入的参数
+    final testCount = widget.testWordCount;
+
+    // 随机选择指定数量的单词，直到选满或没有更多单词
+    while (_testWords.length < testCount && availableWords.isNotEmpty) {
       // 使用当前时间的毫秒数作为随机数种子，选择一个随机索引
       final randomIndex =
           DateTime.now().millisecondsSinceEpoch % availableWords.length;
@@ -240,6 +353,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       _wrongCount = 0; // 重置错误计数
       _showResult = false; // 隐藏测试结果
       _selectedAnswer.value = null; // 清空选中答案
+      _userAnswers = {}; // 清空用户答案映射
       _generateTestWords(); // 生成新的测试单词列表
     });
   }
@@ -275,6 +389,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
           currentWord.word.toLowerCase();
     }
 
+    // 存储当前测试题的用户答案
+    _userAnswers[_currentIndex] = _selectedAnswer.value;
+
     setState(() {
       if (isCorrect) {
         _correctCount++; // 正确数量加1
@@ -293,6 +410,10 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         // 移动到下一个测试题
         _currentIndex++;
         _selectedAnswer.value = null; // 清空选中答案
+        // 如果是填空题，清空输入框内容
+        if (_testMode == TestMode.blankFill) {
+          _blankFillController.clear();
+        }
       } else {
         // 测试完成，生成测试记录
         _generateTestRecord();
@@ -326,38 +447,35 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     final questions = <TestQuestion>[];
     for (int i = 0; i < _testWords.length; i++) {
       final word = _testWords[i];
-      // 这里简化处理，实际应该记录每个题目的用户答案
-      // 由于当前测试页面没有存储每个题目的用户答案，这里仅作为示例
+      final userAnswer = _userAnswers[i]; // 从映射中获取用户答案
       TestQuestion question;
       if (_testMode == TestMode.multipleChoice) {
         // 选择题
         final options = _generateOptions(word.meaning);
+        bool isCorrect = userAnswer == word.meaning;
         question = TestQuestion(
           id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
           mode: TestMode.multipleChoice,
           question: word.word,
-          userAnswer: i == _currentIndex ? _selectedAnswer.value : null,
+          userAnswer: userAnswer,
           correctAnswer: word.meaning,
-          status: i == _currentIndex
-              ? (_selectedAnswer.value == word.meaning
-                    ? QuestionStatus.correct
-                    : QuestionStatus.wrong)
+          status: userAnswer != null
+              ? (isCorrect ? QuestionStatus.correct : QuestionStatus.wrong)
               : QuestionStatus.unattempted,
           options: options,
         );
       } else {
         // 填空题
+        bool isCorrect =
+            userAnswer?.trim().toLowerCase() == word.word.toLowerCase();
         question = TestQuestion(
           id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
           mode: TestMode.blankFill,
           question: word.meaning,
-          userAnswer: i == _currentIndex ? _selectedAnswer.value : null,
+          userAnswer: userAnswer,
           correctAnswer: word.word,
-          status: i == _currentIndex
-              ? (_selectedAnswer.value?.trim().toLowerCase() ==
-                        word.word.toLowerCase()
-                    ? QuestionStatus.correct
-                    : QuestionStatus.wrong)
+          status: userAnswer != null
+              ? (isCorrect ? QuestionStatus.correct : QuestionStatus.wrong)
               : QuestionStatus.unattempted,
         );
       }
@@ -841,6 +959,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 40), // 输入框外边距
         child: TextField(
+          controller: _blankFillController, // 使用输入框控制器
           onChanged: (value) => _handleAnswerSelect(value), // 输入变化时更新选中答案
           decoration: InputDecoration(
             hintText: '请输入对应的英文单词', // 提示文本

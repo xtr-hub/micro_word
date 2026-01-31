@@ -1,11 +1,11 @@
 /// JSON编码解码库，用于将单词列表转换为JSON字符串和从JSON字符串转换为单词列表
 import 'dart:convert';
 
-/// IO库，用于文件操作（读写文件）
-import 'dart:io';
+/// Flutter调试库，用于输出调试信息
+import 'package:flutter/foundation.dart';
 
-/// path_provider库，用于获取应用程序文档目录（存储数据文件的位置）
-import 'package:path_provider/path_provider.dart';
+/// 跨平台存储服务
+import '../services/platform_storage.dart';
 
 /// Word模型类，定义了单词的数据结构
 import 'word.dart';
@@ -47,15 +47,6 @@ class WordStorage {
   /// - Future<void>：异步操作，无返回值
   static Future<void> saveWords(List<Word> words) async {
     try {
-      /// 获取应用程序文档目录
-      ///
-      /// 应用文档目录是应用专用的存储区域，只有应用本身可以访问
-      /// 数据会永久保存，直到用户卸载应用或手动清除数据
-      final directory = await getApplicationDocumentsDirectory();
-
-      /// 创建或打开单词数据文件
-      final file = File('${directory.path}/$_fileName');
-
       /// 将单词列表转换为JSON格式
       ///
       /// 转换步骤：
@@ -65,13 +56,13 @@ class WordStorage {
       final jsonList = words.map((word) => word.toJson()).toList();
       final jsonString = json.encode(jsonList);
 
-      /// 将JSON字符串写入文件
-      await file.writeAsString(jsonString);
+      /// 使用跨平台存储服务保存数据
+      await PlatformStorage.saveData('word_data', jsonString);
     } catch (e) {
       /// 如果保存失败，打印错误信息
       ///
       /// 在实际应用中，可能需要更完善的错误处理（如显示错误提示给用户）
-      print('保存单词数据失败: $e');
+      debugPrint('保存单词数据失败: $e');
     }
   }
 
@@ -86,22 +77,16 @@ class WordStorage {
   /// - Future<List<Word>>：异步操作，返回包含所有单词的列表
   static Future<List<Word>> loadWords() async {
     try {
-      /// 获取应用程序文档目录
-      final directory = await getApplicationDocumentsDirectory();
+      /// 使用跨平台存储服务加载数据
+      final jsonString = await PlatformStorage.loadData('word_data');
 
-      /// 创建或打开单词数据文件
-      final file = File('${directory.path}/$_fileName');
-
-      /// 检查文件是否存在
-      if (!file.existsSync()) {
-        /// 如果文件不存在，返回默认单词列表
+      /// 检查数据是否存在
+      if (jsonString == null) {
+        /// 如果数据不存在，返回默认单词列表
         ///
-        /// 首次使用应用时，会返回包含10个默认单词的列表
+        /// 首次使用应用时，会返回包含50个默认单词的列表
         return _getDefaultWords();
       }
-
-      /// 读取文件内容，获取JSON字符串
-      final jsonString = await file.readAsString();
 
       /// 解析JSON数据
       ///
@@ -113,7 +98,7 @@ class WordStorage {
       return jsonList.map((json) => Word.fromJson(json)).toList();
     } catch (e) {
       /// 如果加载失败，打印错误信息
-      print('加载单词数据失败: $e');
+      debugPrint('加载单词数据失败: $e');
 
       /// 失败时返回默认单词列表
       return _getDefaultWords();
@@ -131,17 +116,9 @@ class WordStorage {
   /// - Future<List<Word>>：异步操作，返回重置后的单词列表
   static Future<List<Word>> resetToDefaultWords() async {
     try {
-      /// 获取应用程序文档目录
-      final directory = await getApplicationDocumentsDirectory();
-
-      /// 创建单词数据文件
-      final file = File('${directory.path}/$_fileName');
-
-      /// 删除现有文件（如果存在）
-      if (file.existsSync()) {
-        await file.delete();
-        print('已删除现有数据文件');
-      }
+      /// 删除现有数据（如果存在）
+      await PlatformStorage.deleteData('word_data');
+      debugPrint('已删除现有数据文件');
 
       /// 获取新的默认单词列表
       final defaultWords = _getDefaultWords();
@@ -190,13 +167,34 @@ class WordStorage {
       /// 保存更新后的单词表列表
       await WordListStorage.saveWordLists(wordLists);
 
-      print('已重置为新的50个默认单词');
-      print('已将所有默认单词添加到默认单词表中');
+      debugPrint('已重置为新的50个默认单词');
+      debugPrint('已将所有默认单词添加到默认单词表中');
       return defaultWords;
     } catch (e) {
       /// 如果重置失败，打印错误信息
-      print('重置单词数据失败: $e');
+      debugPrint('重置单词数据失败: $e');
       return _getDefaultWords();
+    }
+  }
+
+  /// 从JSON字符串解析单词列表
+  ///
+  /// 功能：
+  /// - 将JSON字符串解析为单词列表
+  /// - 用于从自定义单词表文件中加载单词
+  ///
+  /// 参数：
+  /// - jsonString：包含单词数据的JSON字符串
+  ///
+  /// 返回值：
+  /// - List<Word>：解析后的单词列表
+  static List<Word> parseWordsFromJson(String jsonString) {
+    try {
+      final jsonList = json.decode(jsonString) as List<dynamic>;
+      return jsonList.map((json) => Word.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('解析单词数据失败: $e');
+      return [];
     }
   }
 

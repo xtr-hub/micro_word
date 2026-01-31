@@ -25,17 +25,29 @@ import 'pages/review_page.dart';
 /// 测试页面组件
 import 'pages/test_page.dart';
 
+/// 测试设置页面组件
+import 'pages/test_settings_page.dart';
+
 /// 单词本页面组件
 import 'pages/word_book_page.dart';
 
 /// 设置页面组件
 import 'pages/settings_page.dart';
 
+/// 学习进度模型
+import 'models/study_progress.dart';
+
+/// 进度持久化服务
+import 'services/progress_persistence_service.dart';
+
+/// 数据一致性服务
+import 'services/data_consistency_service.dart';
+
 /// 应用程序的入口点
 ///
 /// Flutter应用总是从main函数开始执行
 /// 该函数负责初始化应用环境并启动应用
-void main() {
+void main() async {
   /// 确保Flutter框架初始化完成
   ///
   /// 这是调用平台通道前的必要步骤，确保Flutter引擎已完全初始化
@@ -54,6 +66,22 @@ void main() {
   /// SystemUiMode.immersive模式会隐藏状态栏和导航栏
   /// 提供更沉浸式的用户体验，适合学习类应用
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+
+  /// 初始化进度持久化服务
+  ///
+  /// 该服务负责自动保存学习进度和单词数据
+  ProgressPersistenceService.instance.initialize();
+
+  /// 验证和修复数据一致性
+  ///
+  /// 在应用启动时检查数据完整性并修复发现的问题
+  await DataConsistencyService.instance.validateAndRepairData();
+
+  /// 记录应用启动时间
+  ///
+  /// 加载学习进度并更新应用关闭时间
+  final progress = await StudyProgress.load();
+  progress.recordAppCloseTime(DateTime.now());
 
   /// 运行Flutter应用
   ///
@@ -190,6 +218,7 @@ class WordApp extends StatelessWidget {
         '/study': (context) => StudyPage(), // 学习页面路由
         '/review': (context) => ReviewPage(), // 复习页面路由
         '/test': (context) => TestPage(), // 测试页面路由
+        '/test_settings': (context) => TestSettingsPage(), // 测试设置页面路由
         '/wordbook': (context) => WordBookPage(), // 单词本页面路由
         '/settings': (context) => SettingsPage(), // 设置页面路由
       },

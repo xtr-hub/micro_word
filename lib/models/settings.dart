@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 发音类型枚举
@@ -44,12 +45,64 @@ PronunciationType stringToPronunciationType(String typeString) {
   }
 }
 
+/// 排序选项枚举
+///
+/// 定义了四种排序方式：
+/// - word: 按单词字母顺序
+/// - lastStudyTime: 按最后学习时间
+/// - memoryStrength: 按记忆强度
+/// - shuffle: 乱序学习
+enum SortOption { word, lastStudyTime, memoryStrength, shuffle }
+
+/// 将SortOption转换为字符串
+///
+/// 参数：
+/// - option: 排序选项枚举值
+///
+/// 返回值：
+/// - String: 对应的字符串表示
+String sortOptionToString(SortOption option) {
+  switch (option) {
+    case SortOption.word:
+      return 'word';
+    case SortOption.lastStudyTime:
+      return 'lastStudyTime';
+    case SortOption.memoryStrength:
+      return 'memoryStrength';
+    case SortOption.shuffle:
+      return 'shuffle';
+  }
+}
+
+/// 将字符串转换为SortOption
+///
+/// 参数：
+/// - optionString: 字符串表示的排序选项
+///
+/// 返回值：
+/// - SortOption: 对应的枚举值
+SortOption stringToSortOption(String optionString) {
+  switch (optionString) {
+    case 'word':
+      return SortOption.word;
+    case 'lastStudyTime':
+      return SortOption.lastStudyTime;
+    case 'memoryStrength':
+      return SortOption.memoryStrength;
+    case 'shuffle':
+      return SortOption.shuffle;
+    default:
+      return SortOption.word;
+  }
+}
+
 class Settings {
   bool autoPlayPronunciation;
   bool showExampleByDefault;
   PronunciationType pronunciationType;
   int studyGroupSize; // 学习分组大小
   int reviewGroupSize; // 复习分组大小
+  SortOption sortOption; // 排序方式
 
   Settings({
     this.autoPlayPronunciation = true,
@@ -57,6 +110,7 @@ class Settings {
     this.pronunciationType = PronunciationType.american,
     this.studyGroupSize = 5, // 默认学习分组大小为5
     this.reviewGroupSize = 20, // 默认复习分组大小为20
+    this.sortOption = SortOption.word, // 默认排序方式为按单词排序
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -68,6 +122,7 @@ class Settings {
       ),
       studyGroupSize: json['studyGroupSize'] ?? 5,
       reviewGroupSize: json['reviewGroupSize'] ?? 20,
+      sortOption: stringToSortOption(json['sortOption'] ?? 'word'),
     );
   }
 
@@ -78,6 +133,7 @@ class Settings {
       'pronunciationType': pronunciationTypeToString(pronunciationType),
       'studyGroupSize': studyGroupSize,
       'reviewGroupSize': reviewGroupSize,
+      'sortOption': sortOptionToString(sortOption),
     };
   }
 
@@ -87,7 +143,7 @@ class Settings {
       final jsonString = json.encode(toJson());
       await prefs.setString('settings', jsonString);
     } catch (e) {
-      print('保存设置失败: $e');
+      debugPrint('保存设置失败: $e');
     }
   }
 
@@ -101,7 +157,7 @@ class Settings {
         return Settings.fromJson(jsonData);
       }
     } catch (e) {
-      print('加载设置失败: $e');
+      debugPrint('加载设置失败: $e');
     }
 
     return Settings();

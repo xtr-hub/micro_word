@@ -115,7 +115,7 @@ class ThemeProvider extends ChangeNotifier {
       /// 如果保存失败，打印错误信息
       ///
       /// 在实际应用中，可能需要更完善的错误处理
-      print('保存主题设置失败: $e');
+      debugPrint('保存主题设置失败: $e');
     }
   }
 

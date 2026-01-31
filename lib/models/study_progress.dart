@@ -1,11 +1,86 @@
 /// JSON编码解码库，用于将对象转换为JSON字符串和从JSON字符串转换为对象
 import 'dart:convert';
 
-/// IO库，用于文件操作（读写文件）
-import 'dart:io';
+/// Flutter调试库，用于输出调试信息
+import 'package:flutter/foundation.dart';
 
-/// path_provider库，用于获取应用程序文档目录（存储数据文件的位置）
-import 'package:path_provider/path_provider.dart';
+/// 跨平台存储服务
+import '../services/platform_storage.dart';
+
+/// 单词模型，用于获取StudyStatus枚举
+import 'word.dart';
+
+/// 复习记录类
+///
+/// 用于记录每次复习的详细信息
+class ReviewRecord {
+  /// 复习时间
+  final DateTime timestamp;
+
+  /// 复习结果（是否正确）
+  final bool isCorrect;
+
+  /// 复习时单词的状态
+  final StudyStatus status;
+
+  ReviewRecord({
+    required this.timestamp,
+    required this.isCorrect,
+    required this.status,
+  });
+
+  factory ReviewRecord.fromJson(Map<String, dynamic> json) {
+    return ReviewRecord(
+      timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp']),
+      isCorrect: json['isCorrect'],
+      status: StudyStatus.values[json['status']],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'isCorrect': isCorrect,
+      'status': status.index,
+    };
+  }
+}
+
+/// 学习记录类
+///
+/// 用于记录每次学习的详细信息
+class StudyRecord {
+  /// 学习时间
+  final DateTime timestamp;
+
+  /// 学习结果（是否掌握）
+  final bool isMastered;
+
+  /// 学习时单词的状态
+  final StudyStatus status;
+
+  StudyRecord({
+    required this.timestamp,
+    required this.isMastered,
+    required this.status,
+  });
+
+  factory StudyRecord.fromJson(Map<String, dynamic> json) {
+    return StudyRecord(
+      timestamp: DateTime.fromMillisecondsSinceEpoch(json['timestamp']),
+      isMastered: json['isMastered'],
+      status: StudyStatus.values[json['status']],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'timestamp': timestamp.millisecondsSinceEpoch,
+      'isMastered': isMastered,
+      'status': status.index,
+    };
+  }
+}
 
 /// 学习进度模型类
 ///
@@ -93,6 +168,26 @@ class StudyProgress {
   /// 值：签到状态（true：已签到，false：未签到）
   Map<String, bool> checkInHistory;
 
+  /// 上次应用关闭时间
+  ///
+  /// 记录用户上次关闭应用的时间
+  /// 用于计算应用不活动时间，调整复习量
+  DateTime lastAppCloseTime;
+
+  /// 复习进度记录
+  ///
+  /// 存储每次复习的详细信息
+  /// 键：单词ID
+  /// 值：复习记录（包含时间戳和结果）
+  Map<int, List<ReviewRecord>> reviewRecords;
+
+  /// 学习进度记录
+  ///
+  /// 存储每次学习的详细信息
+  /// 键：单词ID
+  /// 值：学习记录（包含时间戳和结果）
+  Map<int, List<StudyRecord>> studyRecords;
+
   /// 构造函数，用于创建StudyProgress实例
   ///
   /// 参数说明：
@@ -105,23 +200,29 @@ class StudyProgress {
   /// - lastStudyDate：上次学习日期，默认值为当前时间
   /// - todayStudyTime：今日学习时长，默认值为0
   StudyProgress({
-    this.totalWordsStudied = 0, // 总学习单词数，默认值为0
-    this.masteredWords = 0, // 已掌握单词数，默认值为0
-    this.todayWordsStudied = 0, // 今日学习单词数，默认值为0
-    this.consecutiveDays = 0, // 连续学习天数，默认值为0
-    this.totalStudyTime = 0, // 总学习时长，默认值为0
-    this.dailyGoal = 20, // 每日学习目标，默认值为20个单词
-    this.dailyReviewGoal = 50, // 每日复习目标，默认值为50个单词
-    DateTime? lastStudyDate, // 上次学习日期，可选参数
-    this.todayStudyTime = 0, // 今日学习时长，默认值为0
-    this.todayWordsReviewed = 0, // 今日已复习单词数，默认值为0
-    this.reviewWords = 0, // 待复习单词数，默认值为0个单词
-    DateTime? lastCheckInDate, // 上次签到日期，可选参数
-    Map<String, bool>? checkInHistory, // 签到记录，可选参数
+    this.totalWordsStudied = 0,
+    this.masteredWords = 0,
+    this.todayWordsStudied = 0,
+    this.consecutiveDays = 0,
+    this.totalStudyTime = 0,
+    this.dailyGoal = 20,
+    this.dailyReviewGoal = 50,
+    DateTime? lastStudyDate,
+    this.todayStudyTime = 0,
+    this.todayWordsReviewed = 0,
+    this.reviewWords = 0,
+    DateTime? lastCheckInDate,
+    Map<String, bool>? checkInHistory,
+    DateTime? lastAppCloseTime,
+    Map<int, List<ReviewRecord>>? reviewRecords,
+    Map<int, List<StudyRecord>>? studyRecords,
   }) : lastStudyDate = lastStudyDate ?? DateTime.now(),
        lastCheckInDate =
            lastCheckInDate ?? DateTime.now().subtract(Duration(days: 1)),
-       checkInHistory = checkInHistory ?? {};
+       checkInHistory = checkInHistory ?? {},
+       lastAppCloseTime = lastAppCloseTime ?? DateTime.now(),
+       reviewRecords = reviewRecords ?? {},
+       studyRecords = studyRecords ?? {};
 
   /// 工厂构造函数：从JSON数据创建StudyProgress实例
   ///
@@ -136,27 +237,49 @@ class StudyProgress {
   /// - StudyProgress：创建的StudyProgress实例
   factory StudyProgress.fromJson(Map<String, dynamic> json) {
     return StudyProgress(
-      totalWordsStudied: json['totalWordsStudied'], // 从JSON获取总学习单词数
-      masteredWords: json['masteredWords'], // 从JSON获取已掌握单词数
-      todayWordsStudied: json['todayWordsStudied'], // 从JSON获取今日学习单词数
-      consecutiveDays: json['consecutiveDays'], // 从JSON获取连续学习天数
-      totalStudyTime: json['totalStudyTime'], // 从JSON获取总学习时长
-      dailyGoal: json['dailyGoal'], // 从JSON获取每日学习目标
-      dailyReviewGoal: json['dailyReviewGoal'] ?? 50, // 从JSON获取每日复习目标，默认值为50
-      lastStudyDate: DateTime.fromMillisecondsSinceEpoch(
-        json['lastStudyDate'],
-      ), // 将毫秒时间戳转换为DateTime对象
-      todayStudyTime: json['todayStudyTime'], // 从JSON获取今日学习时长
-      todayWordsReviewed:
-          json['todayWordsReviewed'] ?? 0, // 从JSON获取今日已复习单词数，默认值为0
-      reviewWords: json['reviewWords'] ?? 0, // 从JSON获取待复习单词数，默认值为0
+      totalWordsStudied: json['totalWordsStudied'],
+      masteredWords: json['masteredWords'],
+      todayWordsStudied: json['todayWordsStudied'],
+      consecutiveDays: json['consecutiveDays'],
+      totalStudyTime: json['totalStudyTime'],
+      dailyGoal: json['dailyGoal'],
+      dailyReviewGoal: json['dailyReviewGoal'] ?? 50,
+      lastStudyDate: DateTime.fromMillisecondsSinceEpoch(json['lastStudyDate']),
+      todayStudyTime: json['todayStudyTime'],
+      todayWordsReviewed: json['todayWordsReviewed'] ?? 0,
+      reviewWords: json['reviewWords'] ?? 0,
       lastCheckInDate: DateTime.fromMillisecondsSinceEpoch(
         json['lastCheckInDate'] ??
             DateTime.now().subtract(Duration(days: 1)).millisecondsSinceEpoch,
-      ), // 将毫秒时间戳转换为DateTime对象
-      checkInHistory: Map<String, bool>.from(
-        json['checkInHistory'] ?? {},
-      ), // 从JSON获取签到记录
+      ),
+      checkInHistory: Map<String, bool>.from(json['checkInHistory'] ?? {}),
+      lastAppCloseTime: json['lastAppCloseTime'] != null
+          ? DateTime.fromMillisecondsSinceEpoch(json['lastAppCloseTime'])
+          : null,
+      reviewRecords: json['reviewRecords'] != null
+          ? Map<int, List<ReviewRecord>>.from(
+              json['reviewRecords'].map(
+                (key, value) => MapEntry(
+                  int.parse(key),
+                  (value as List)
+                      .map((item) => ReviewRecord.fromJson(item))
+                      .toList(),
+                ),
+              ),
+            )
+          : null,
+      studyRecords: json['studyRecords'] != null
+          ? Map<int, List<StudyRecord>>.from(
+              json['studyRecords'].map(
+                (key, value) => MapEntry(
+                  int.parse(key),
+                  (value as List)
+                      .map((item) => StudyRecord.fromJson(item))
+                      .toList(),
+                ),
+              ),
+            )
+          : null,
     );
   }
 
@@ -170,20 +293,32 @@ class StudyProgress {
   /// - Map<String, dynamic>：包含学习进度数据的JSON映射
   Map<String, dynamic> toJson() {
     return {
-      'totalWordsStudied': totalWordsStudied, // 保存总学习单词数
-      'masteredWords': masteredWords, // 保存已掌握单词数
-      'todayWordsStudied': todayWordsStudied, // 保存今日学习单词数
-      'consecutiveDays': consecutiveDays, // 保存连续学习天数
-      'totalStudyTime': totalStudyTime, // 保存总学习时长
-      'dailyGoal': dailyGoal, // 保存每日学习目标
-      'dailyReviewGoal': dailyReviewGoal, // 保存每日复习目标
-      'lastStudyDate': lastStudyDate.millisecondsSinceEpoch, // 保存上次学习日期为毫秒时间戳
-      'todayStudyTime': todayStudyTime, // 保存今日学习时长
-      'todayWordsReviewed': todayWordsReviewed, // 保存今日已复习单词数
-      'reviewWords': reviewWords, // 保存待复习单词数
-      'lastCheckInDate':
-          lastCheckInDate.millisecondsSinceEpoch, // 保存上次签到日期为毫秒时间戳
-      'checkInHistory': checkInHistory, // 保存签到记录
+      'totalWordsStudied': totalWordsStudied,
+      'masteredWords': masteredWords,
+      'todayWordsStudied': todayWordsStudied,
+      'consecutiveDays': consecutiveDays,
+      'totalStudyTime': totalStudyTime,
+      'dailyGoal': dailyGoal,
+      'dailyReviewGoal': dailyReviewGoal,
+      'lastStudyDate': lastStudyDate.millisecondsSinceEpoch,
+      'todayStudyTime': todayStudyTime,
+      'todayWordsReviewed': todayWordsReviewed,
+      'reviewWords': reviewWords,
+      'lastCheckInDate': lastCheckInDate.millisecondsSinceEpoch,
+      'checkInHistory': checkInHistory,
+      'lastAppCloseTime': lastAppCloseTime?.millisecondsSinceEpoch,
+      'reviewRecords': reviewRecords?.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value.map((record) => record.toJson()).toList(),
+        ),
+      ),
+      'studyRecords': studyRecords?.map(
+        (key, value) => MapEntry(
+          key.toString(),
+          value.map((record) => record.toJson()).toList(),
+        ),
+      ),
     };
   }
 
@@ -198,27 +333,10 @@ class StudyProgress {
   /// - Future<void>：异步操作，无返回值
   Future<void> save() async {
     try {
-      /// 获取应用程序文档目录
-      ///
-      /// 应用文档目录是应用专用的存储区域，只有应用本身可以访问
-      /// 数据会永久保存，直到用户卸载应用或手动清除数据
-      final directory = await getApplicationDocumentsDirectory();
-
-      /// 创建或打开学习进度文件
-      ///
-      /// 文件路径：应用文档目录/study_progress.json
-      final file = File('${directory.path}/study_progress.json');
-
-      /// 将StudyProgress实例转换为JSON字符串
       final jsonString = json.encode(toJson());
-
-      /// 将JSON字符串写入文件
-      await file.writeAsString(jsonString);
+      await PlatformStorage.saveData('study_progress', jsonString);
     } catch (e) {
-      /// 如果保存失败，打印错误信息
-      ///
-      /// 在实际应用中，可能需要更完善的错误处理（如显示错误提示给用户）
-      print('保存学习进度失败: $e');
+      debugPrint('保存学习进度失败: $e');
     }
   }
 
@@ -233,62 +351,33 @@ class StudyProgress {
   /// - Future<StudyProgress>：异步操作，返回StudyProgress实例
   static Future<StudyProgress> load() async {
     try {
-      /// 获取应用程序文档目录
-      final directory = await getApplicationDocumentsDirectory();
+      final jsonString = await PlatformStorage.loadData('study_progress');
 
-      /// 创建或打开学习进度文件
-      final file = File('${directory.path}/study_progress.json');
-
-      /// 如果文件不存在，返回默认的StudyProgress实例
-      if (!file.existsSync()) {
+      if (jsonString == null) {
         return StudyProgress();
       }
 
-      /// 读取文件内容（JSON字符串）
-      final jsonString = await file.readAsString();
-
-      /// 将JSON字符串解码为Map对象
       final jsonData = json.decode(jsonString) as Map<String, dynamic>;
-
-      /// 从JSON数据创建StudyProgress实例
       final progress = StudyProgress.fromJson(jsonData);
 
-      /// 检查是否跨天，重置今日数据
-      ///
-      /// 如果上次学习日期和今天不是同一天，需要：
-      /// 1. 重置今日学习单词数和今日学习时长
-      /// 2. 重置今日已复习单词数
-      /// 3. 更新连续学习天数
-      /// 4. 更新上次学习日期为今天
       if (!isSameDay(progress.lastStudyDate, DateTime.now())) {
-        /// 重置今日学习单词数为0
         progress.todayWordsStudied = 0;
-
-        /// 重置今日学习时长为0
         progress.todayStudyTime = 0;
-
-        /// 重置今日已复习单词数为0
         progress.todayWordsReviewed = 0;
 
-        /// 计算昨天的日期
         final yesterday = DateTime.now().subtract(Duration(days: 1));
         if (isSameDay(progress.lastStudyDate, yesterday)) {
-          /// 如果昨天学习过，连续天数+1
           progress.consecutiveDays++;
         } else {
-          /// 如果昨天没学习，连续天数重置为1
           progress.consecutiveDays = 1;
         }
 
-        /// 更新上次学习日期为当前日期
         progress.lastStudyDate = DateTime.now();
       }
 
-      /// 返回加载后的学习进度
       return progress;
     } catch (e) {
-      /// 如果加载失败，打印错误信息并返回默认实例
-      print('加载学习进度失败: $e');
+      debugPrint('加载学习进度失败: $e');
       return StudyProgress();
     }
   }
@@ -304,12 +393,12 @@ class StudyProgress {
   /// - count：本次学习的单词数量
   /// - isMastered：本次学习的单词是否已掌握
   void updateWordsStudied(int count, bool isMastered) {
-    totalWordsStudied += count; // 增加总学习单词数
-    todayWordsStudied += count; // 增加今日学习单词数
+    totalWordsStudied += count;
+    todayWordsStudied += count;
     if (isMastered) {
-      masteredWords += count; // 如果是掌握的单词，增加已掌握单词数
+      masteredWords += count;
     }
-    save(); // 保存更新后的进度到本地文件
+    save();
   }
 
   /// 更新复习单词数
@@ -322,12 +411,9 @@ class StudyProgress {
   /// 参数：
   /// - count：本次复习的单词数量
   void updateWordsReviewed(int count) {
-    todayWordsReviewed += count; // 增加今日已复习单词数
-    reviewWords = (reviewWords - count).clamp(
-      0,
-      reviewWords,
-    ); // 减少待复习单词数，确保不小于0
-    save(); // 保存更新后的进度到本地文件
+    todayWordsReviewed += count;
+    reviewWords = (reviewWords - count).clamp(0, reviewWords);
+    save();
   }
 
   /// 更新学习时长
@@ -339,9 +425,9 @@ class StudyProgress {
   /// 参数：
   /// - seconds：本次学习的时长（秒）
   void updateStudyTime(int seconds) {
-    totalStudyTime += seconds; // 增加总学习时长
-    todayStudyTime += seconds; // 增加今日学习时长
-    save(); // 保存更新后的进度到本地文件
+    totalStudyTime += seconds;
+    todayStudyTime += seconds;
+    save();
   }
 
   /// 更新每日学习目标
@@ -353,8 +439,8 @@ class StudyProgress {
   /// 参数：
   /// - newGoal：新的每日学习目标（单词数）
   void updateDailyGoal(int newGoal) {
-    dailyGoal = newGoal; // 更新每日学习目标
-    save(); // 保存更新后的进度到本地文件
+    dailyGoal = newGoal;
+    save();
   }
 
   /// 更新每日复习目标
@@ -366,69 +452,183 @@ class StudyProgress {
   /// 参数：
   /// - newGoal：新的每日复习目标（单词数）
   void updateDailyReviewGoal(int newGoal) {
-    dailyReviewGoal = newGoal; // 更新每日复习目标
-    save(); // 保存更新后的进度到本地文件
+    dailyReviewGoal = newGoal;
+    save();
   }
 
-  /// 检查是否完成每日学习目标
+  /// 记录单词学习
   ///
   /// 功能：
-  /// - 判断今日学习单词数是否达到或超过每日学习目标
+  /// - 记录单词的学习详细信息
+  /// - 自动保存更新后的进度到本地文件
+  ///
+  /// 参数：
+  /// - wordId：单词ID
+  /// - isMastered：是否掌握
+  /// - status：学习状态
+  void recordStudy(int wordId, bool isMastered, StudyStatus status) {
+    if (!studyRecords.containsKey(wordId)) {
+      studyRecords[wordId] = [];
+    }
+    studyRecords[wordId]!.add(
+      StudyRecord(
+        timestamp: DateTime.now(),
+        isMastered: isMastered,
+        status: status,
+      ),
+    );
+    save();
+  }
+
+  /// 记录单词复习
+  ///
+  /// 功能：
+  /// - 记录单词的复习详细信息
+  /// - 自动保存更新后的进度到本地文件
+  ///
+  /// 参数：
+  /// - wordId：单词ID
+  /// - isCorrect：是否正确
+  /// - status：学习状态
+  void recordReview(int wordId, bool isCorrect, StudyStatus status) {
+    if (!reviewRecords.containsKey(wordId)) {
+      reviewRecords[wordId] = [];
+    }
+    reviewRecords[wordId]!.add(
+      ReviewRecord(
+        timestamp: DateTime.now(),
+        isCorrect: isCorrect,
+        status: status,
+      ),
+    );
+    save();
+  }
+
+  /// 记录应用关闭时间
+  ///
+  /// 功能：
+  /// - 记录应用关闭的时间
+  /// - 自动保存更新后的进度到本地文件
+  ///
+  /// 参数：
+  /// - closeTime：关闭时间
+  void recordAppCloseTime(DateTime closeTime) {
+    lastAppCloseTime = closeTime;
+    save();
+  }
+
+  /// 计算应用不活动时间
+  ///
+  /// 功能：
+  /// - 计算应用上次关闭到现在的时长
+  /// - 用于复习算法调整复习量
   ///
   /// 返回值：
-  /// - bool：true表示已完成目标，false表示未完成
+  /// - Duration：不活动时长
+  Duration calculateInactiveTime() {
+    final now = DateTime.now();
+    return now.difference(lastAppCloseTime);
+  }
+
+  /// 计算需要增加的复习量
+  ///
+  /// 功能：
+  /// - 根据应用不活动时间计算需要增加的复习量
+  /// - 不活动时间越长，需要复习的单词越多
+  ///
+  /// 返回值：
+  /// - int：需要增加的复习单词数
+  int calculateAdditionalReviewVolume() {
+    final inactiveTime = calculateInactiveTime();
+    final daysInactive = inactiveTime.inDays;
+
+    if (daysInactive < 1) {
+      return 0;
+    } else if (daysInactive < 3) {
+      return 5;
+    } else if (daysInactive < 7) {
+      return 10;
+    } else if (daysInactive < 14) {
+      return 20;
+    } else {
+      return 30;
+    }
+  }
+
+  /// 判断是否达成今日学习目标
+  ///
+  /// 功能：
+  /// - 检查今日学习单词数是否达到每日学习目标
+  ///
+  /// 返回值：
+  /// - bool：true表示已达成目标，false表示未达成
   bool isDailyGoalAchieved() {
-    return todayWordsStudied >= dailyGoal; // 如果今日学习单词数大于等于每日目标，返回true
+    return todayWordsStudied >= dailyGoal;
   }
 
-  /// 检查是否完成每日复习目标
+  /// 判断是否达成今日复习目标
   ///
   /// 功能：
-  /// - 判断今日复习单词数是否达到或超过每日复习目标
+  /// - 检查今日复习单词数是否达到每日复习目标
   ///
   /// 返回值：
-  /// - bool：true表示已完成目标，false表示未完成
+  /// - bool：true表示已达成目标，false表示未达成
   bool isDailyReviewGoalAchieved() {
-    return todayWordsReviewed >= dailyReviewGoal; // 如果今日复习单词数大于等于每日复习目标，返回true
+    return todayWordsReviewed >= dailyReviewGoal;
   }
 
-  /// 计算每日学习目标完成进度（百分比）
+  /// 获取学习进度百分比
   ///
   /// 功能：
-  /// - 计算今日学习单词数占每日学习目标的百分比
-  /// - 返回值范围：0.0（未开始）到1.0（已完成）
+  /// - 计算今日学习进度相对于每日目标的百分比
   ///
   /// 返回值：
-  /// - double：完成进度，范围0.0-1.0
-  double getDailyGoalProgress() {
-    if (dailyGoal == 0) return 0.0; // 如果每日目标为0，返回0.0
-    /// 计算进度并限制在0.0到1.0之间
-    ///
-    /// 使用clamp方法确保返回值不会小于0.0或大于1.0
-    return (todayWordsStudied / dailyGoal).clamp(0.0, 1.0);
+  /// - double：进度百分比（0-100）
+  double getDailyProgressPercentage() {
+    if (dailyGoal == 0) return 100;
+    return (todayWordsStudied / dailyGoal * 100).clamp(0, 100);
   }
 
-  /// 计算每日复习目标完成进度（百分比）
+  /// 获取复习进度百分比
   ///
   /// 功能：
-  /// - 计算今日复习单词数占每日复习目标的百分比
-  /// - 返回值范围：0.0（未开始）到1.0（已完成）
+  /// - 计算今日复习进度相对于每日复习目标的百分比
   ///
   /// 返回值：
-  /// - double：完成进度，范围0.0-1.0
-  double getDailyReviewGoalProgress() {
-    if (dailyReviewGoal == 0) return 0.0; // 如果每日复习目标为0，返回0.0
-    /// 计算进度并限制在0.0到1.0之间
-    ///
-    /// 使用clamp方法确保返回值不会小于0.0或大于1.0
-    return (todayWordsReviewed / dailyReviewGoal).clamp(0.0, 1.0);
+  /// - double：进度百分比（0-100）
+  double getDailyReviewProgressPercentage() {
+    if (dailyReviewGoal == 0) return 100;
+    return (todayWordsReviewed / dailyReviewGoal * 100).clamp(0, 100);
   }
 
-  /// 格式化日期为字符串（yyyy-MM-dd）
+  /// 格式化学习时长
   ///
   /// 功能：
-  /// - 将DateTime对象格式化为指定格式的字符串
-  /// - 用于签到记录的键名
+  /// - 将秒数转换为易读的时间格式
+  ///
+  /// 参数：
+  /// - seconds：总秒数
+  ///
+  /// 返回值：
+  /// - String：格式化后的时间字符串
+  static String formatStudyTime(int seconds) {
+    final hours = seconds ~/ 3600;
+    final minutes = (seconds % 3600) ~/ 60;
+    final secs = seconds % 60;
+
+    if (hours > 0) {
+      return '${hours}小时${minutes}分钟';
+    } else if (minutes > 0) {
+      return '${minutes}分钟${secs}秒';
+    } else {
+      return '${secs}秒';
+    }
+  }
+
+  /// 格式化日期
+  ///
+  /// 功能：
+  /// - 将日期格式化为易读的字符串
   ///
   /// 参数：
   /// - date：要格式化的日期
@@ -439,69 +639,10 @@ class StudyProgress {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// 检查今天是否已经签到
+  /// 判断两个日期是否是同一天
   ///
   /// 功能：
-  /// - 判断用户今天是否已经执行过签到操作
-  ///
-  /// 返回值：
-  /// - bool：true表示今天已签到，false表示今天未签到
-  bool isTodayCheckedIn() {
-    return isSameDay(lastCheckInDate, DateTime.now());
-  }
-
-  /// 执行签到操作
-  ///
-  /// 功能：
-  /// - 记录用户的签到行为
-  /// - 更新签到日期和签到记录
-  /// - 保存更新后的进度到本地文件
-  ///
-  /// 返回值：
-  /// - bool：true表示签到成功，false表示今天已签到
-  bool checkIn() {
-    if (isTodayCheckedIn()) {
-      return false; // 今天已签到，返回false
-    }
-
-    final today = DateTime.now();
-    lastCheckInDate = today;
-    checkInHistory[formatDate(today)] = true;
-    save(); // 保存更新后的进度到本地文件
-    return true;
-  }
-
-  /// 获取指定月份的签到记录
-  ///
-  /// 功能：
-  /// - 获取用户在指定月份的所有签到记录
-  /// - 用于生成学习日历
-  ///
-  /// 参数：
-  /// - year：年份
-  /// - month：月份（1-12）
-  ///
-  /// 返回值：
-  /// - Map<int, bool>：键为日期（1-31），值为签到状态
-  Map<int, bool> getCheckInRecordsForMonth(int year, int month) {
-    final records = <int, bool>{};
-    final firstDay = DateTime(year, month, 1);
-    final lastDay = DateTime(year, month + 1, 0);
-
-    for (int day = 1; day <= lastDay.day; day++) {
-      final date = DateTime(year, month, day);
-      final dateStr = formatDate(date);
-      records[day] = checkInHistory[dateStr] ?? false;
-    }
-
-    return records;
-  }
-
-  /// 辅助方法：检查两个日期是否为同一天
-  ///
-  /// 功能：
-  /// - 比较两个DateTime对象是否为同一天
-  /// - 只比较年、月、日，不比较时、分、秒
+  /// - 比较两个日期的年、月、日是否相同
   ///
   /// 参数：
   /// - date1：第一个日期
@@ -510,8 +651,78 @@ class StudyProgress {
   /// 返回值：
   /// - bool：true表示是同一天，false表示不是同一天
   static bool isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && // 检查年份是否相同
-        date1.month == date2.month && // 检查月份是否相同
-        date1.day == date2.day; // 检查日期是否相同
+    return date1.year == date2.year &&
+        date1.month == date2.month &&
+        date1.day == date2.day;
+  }
+
+  /// 判断今天是否已签到
+  ///
+  /// 功能：
+  /// - 检查用户今天是否已经签到
+  ///
+  /// 返回值：
+  /// - bool：true表示今天已签到，false表示今天未签到
+  bool isTodayCheckedIn() {
+    final todayKey = formatDate(DateTime.now());
+    return checkInHistory[todayKey] ?? false;
+  }
+
+  /// 执行签到
+  ///
+  /// 功能：
+  /// - 记录用户今天的签到状态
+  /// - 更新连续签到天数
+  /// - 自动保存更新后的进度到本地文件
+  ///
+  /// 返回值：
+  /// - bool：true表示签到成功，false表示今天已经签到过了
+  bool checkIn() {
+    final today = DateTime.now();
+    final todayKey = formatDate(today);
+
+    if (checkInHistory[todayKey] ?? false) {
+      return false;
+    }
+
+    checkInHistory[todayKey] = true;
+
+    final yesterday = today.subtract(Duration(days: 1));
+    final yesterdayKey = formatDate(yesterday);
+
+    if (checkInHistory[yesterdayKey] ?? false) {
+      consecutiveDays++;
+    } else {
+      consecutiveDays = 1;
+    }
+
+    lastCheckInDate = today;
+    save();
+    return true;
+  }
+
+  /// 获取指定月份的签到记录
+  ///
+  /// 功能：
+  /// - 获取指定年月的签到记录
+  /// - 返回该月份每一天的签到状态
+  ///
+  /// 参数：
+  /// - year：年份
+  /// - month：月份（1-12）
+  ///
+  /// 返回值：
+  /// - Map<int, bool>：键为日期（1-31），值为签到状态
+  Map<int, bool> getCheckInRecordsForMonth(int year, int month) {
+    Map<int, bool> records = {};
+    final daysInMonth = DateTime(year, month + 1, 0).day;
+
+    for (int day = 1; day <= daysInMonth; day++) {
+      final dateKey =
+          '$year-${month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+      records[day] = checkInHistory[dateKey] ?? false;
+    }
+
+    return records;
   }
 }

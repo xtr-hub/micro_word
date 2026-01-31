@@ -3,6 +3,7 @@ import '../models/word.dart';
 import '../models/word_storage.dart';
 import '../models/word_list.dart';
 import '../models/word_list_storage.dart';
+import '../models/settings.dart';
 
 // 单词本页面
 class WordBookPage extends StatefulWidget {
@@ -29,6 +30,12 @@ class _WordBookPageState extends State<WordBookPage> {
   bool _isLoading = true;
   // 排序方式
   SortOption _sortOption = SortOption.word;
+  // 乱序单词ID顺序
+  List<int>? _shuffledWordIds;
+  // 乱序状态是否已生成
+  bool _isShuffleGenerated = false;
+  // 设置
+  late Settings _settings;
 
   @override
   void initState() {
@@ -41,15 +48,27 @@ class _WordBookPageState extends State<WordBookPage> {
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
+      // 重置乱序状态，因为单词数据可能发生变化
+      _shuffledWordIds = null;
+      _isShuffleGenerated = false;
     });
 
     // 并行加载单词和单词表数据
     final wordsFuture = WordStorage.loadWords();
     final wordListsFuture = WordListStorage.loadWordLists();
+    final settingsFuture = Settings.load();
 
-    final results = await Future.wait([wordsFuture, wordListsFuture]);
+    final results = await Future.wait([
+      wordsFuture,
+      wordListsFuture,
+      settingsFuture,
+    ]);
     _words = results[0] as List<Word>;
     _wordLists = results[1] as List<WordList>;
+    _settings = results[2] as Settings;
+
+    // 从设置中读取排序选项
+    _sortOption = _settings.sortOption;
 
     // 找到当前单词表
     _currentWordList = _wordLists.firstWhere(
@@ -119,6 +138,32 @@ class _WordBookPageState extends State<WordBookPage> {
           (a, b) => b.memoryStrength.compareTo(a.memoryStrength),
         );
         break;
+      case SortOption.shuffle:
+        _shuffleWords();
+        break;
+    }
+  }
+
+  // 乱序排序单词
+  void _shuffleWords() {
+    // 如果还没有生成乱序顺序，生成一个
+    if (!_isShuffleGenerated) {
+      // 获取当前单词表中的单词ID
+      final wordIds = _filteredWords.map((word) => word.id).toList();
+      // 打乱顺序
+      wordIds.shuffle();
+      // 保存乱序顺序
+      _shuffledWordIds = wordIds;
+      _isShuffleGenerated = true;
+    }
+
+    // 如果已经有乱序顺序，根据该顺序排序
+    if (_shuffledWordIds != null) {
+      _filteredWords.sort((a, b) {
+        final indexA = _shuffledWordIds!.indexOf(a.id);
+        final indexB = _shuffledWordIds!.indexOf(b.id);
+        return indexA.compareTo(indexB);
+      });
     }
   }
 
@@ -135,6 +180,9 @@ class _WordBookPageState extends State<WordBookPage> {
     // 更新当前单词表并重新加载数据
     setState(() {
       _currentWordList = wordList;
+      // 重置乱序状态，因为不同单词表的乱序顺序应该不同
+      _shuffledWordIds = null;
+      _isShuffleGenerated = false;
     });
 
     // 重新应用过滤条件
@@ -333,12 +381,16 @@ class _WordBookPageState extends State<WordBookPage> {
   }
 
   // 设置排序方式
-  void _setSortOption(SortOption? option) {
+  void _setSortOption(SortOption? option) async {
     if (option != null) {
       setState(() {
         _sortOption = option;
         _sortWords();
       });
+
+      // 保存排序选项到设置
+      _settings.sortOption = option;
+      await _settings.save();
     }
   }
 
@@ -1055,13 +1107,8 @@ class _WordBookPageState extends State<WordBookPage> {
         return '按学习时间';
       case SortOption.memoryStrength:
         return '按记忆强度';
+      case SortOption.shuffle:
+        return '乱序学习';
     }
   }
-}
-
-// 排序选项枚举
-enum SortOption {
-  word, // 按单词字母顺序
-  lastStudyTime, // 按最后学习时间
-  memoryStrength, // 按记忆强度
 }

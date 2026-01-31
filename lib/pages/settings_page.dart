@@ -57,6 +57,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 复习分组大小
   int _reviewGroupSize = 20;
 
+  /// 排序选项
+  SortOption _sortOption = SortOption.word;
+
   /// 数据加载状态
   bool _isLoading = true;
 
@@ -99,6 +102,7 @@ class _SettingsPageState extends State<SettingsPage> {
     _pronunciationType = _settings.pronunciationType;
     _studyGroupSize = _settings.studyGroupSize;
     _reviewGroupSize = _settings.reviewGroupSize;
+    _sortOption = _settings.sortOption;
 
     setState(() {
       _isLoading = false; // 加载完成，隐藏加载指示器
@@ -255,6 +259,17 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _pronunciationType = type;
       _settings.pronunciationType = type;
+    });
+  }
+
+  /// 切换排序选项
+  ///
+  /// 参数：
+  /// - option: 要切换到的排序选项
+  void _toggleSortOption(SortOption option) {
+    setState(() {
+      _sortOption = option;
+      _settings.sortOption = option;
     });
   }
 
@@ -514,6 +529,80 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                           child: Text(
                             _getPronunciationTypeText(type), // 显示发音类型文本
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color, // 字体颜色
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    underline: SizedBox(), // 移除下拉框下划线
+                    icon: Icon(
+                      // 下拉箭头
+                      Icons.arrow_drop_down,
+                      color: Colors.blue.shade700,
+                    ),
+                    dropdownColor: // 下拉菜单背景色
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.white,
+                    menuMaxHeight: 200, // 下拉菜单最大高度
+                    style: TextStyle(
+                      // 下拉菜单项样式
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                    borderRadius: BorderRadius.circular(15), // 下拉菜单圆角
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 10),
+
+              // 排序选项选择
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '单词排序方式',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                trailing: Container(
+                  // 下拉选择框容器
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButton<SortOption>(
+                    value: _sortOption, // 当前选中的排序选项
+                    onChanged: (option) =>
+                        _toggleSortOption(option!), // 选择变化时的回调
+                    items: SortOption.values.map((option) {
+                      // 排序选项
+                      return DropdownMenuItem(
+                        value: option,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            _getSortOptionText(option), // 显示排序选项文本
                             style: TextStyle(
                               fontSize: 16,
                               color: Theme.of(
@@ -1006,6 +1095,26 @@ class _SettingsPageState extends State<SettingsPage> {
         return '美式发音';
       case PronunciationType.british:
         return '英式发音';
+    }
+  }
+
+  ///
+  /// 获取排序选项的中文描述
+  ///
+  /// 参数：
+  /// - option: 排序选项枚举值
+  ///
+  /// 返回：排序选项的中文描述
+  String _getSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.word:
+        return '按单词排序';
+      case SortOption.lastStudyTime:
+        return '按学习时间';
+      case SortOption.memoryStrength:
+        return '按记忆强度';
+      case SortOption.shuffle:
+        return '乱序学习';
     }
   }
 
