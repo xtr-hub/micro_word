@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/word.dart';
 import '../models/word_storage.dart';
@@ -8,6 +9,7 @@ import '../models/study_progress.dart';
 import '../models/settings.dart';
 import '../services/audio_service.dart';
 import '../services/progress_persistence_service.dart';
+import '../services/data_manager.dart';
 
 /// 复习页面 - 符合设计图要求
 ///
@@ -28,14 +30,13 @@ class _ReviewPageState extends State<ReviewPage>
   late List<Word> _words;
   late WordList _currentWordList;
   late List<Word> _filteredWords;
-  late List<List<Word>> _wordGroups; // 分组后的单词列表
-  int _currentGroup = 0; // 当前分组索引
-  int _currentIndexInGroup = 0; // 当前在分组中的索引
   bool _isLoading = true;
 
-  // 分组学习统计
-  late DateTime _groupStartTime; // 当前分组的开始时间
-  int _groupCorrectCount = 0; // 当前分组的正确答案数量
+  // 容器管理
+  List<Word> _reviewContainer = []; // 复习容器
+  List<Word> _originalContainer = []; // 原始容器（用于拼写测试）
+  Map<int, int> _continuousCorrectCount = {}; // 单词ID -> 连续答对次数
+  Random _random = Random();
 
   // 学习相关
   late StudyProgress _progress;
@@ -44,6 +45,15 @@ class _ReviewPageState extends State<ReviewPage>
   // 当前选择的状态
   StudyStatus _selectedStatus = StudyStatus.learning;
 
+  // 拼写测试相关
+  bool _isSpellingTest = false;
+  String _spellingInput = '';
+  int _spellingTestIndex = 0;
+  bool _showCorrectSpelling = false;
+
+  // 学习小结相关
+  List<Word> _masteredWords = [];
+
   // 乱序单词ID顺序
   List<int>? _shuffledWordIds;
   // 乱序状态是否已生成
@@ -51,7 +61,15 @@ class _ReviewPageState extends State<ReviewPage>
 
   // 获取当前单词
   Word get _currentWord {
-    return _wordGroups[_currentGroup][_currentIndexInGroup];
+    if (_reviewContainer.isEmpty) {
+      // 如果容器为空，返回第一个单词作为默认值
+      return _originalContainer.isNotEmpty
+          ? _originalContainer.first
+          : _words.isNotEmpty
+          ? _words.first
+          : Word(id: 0, word: 'empty', phonetic: '', meaning: '无单词');
+    }
+    return _reviewContainer[0];
   }
 
   // 例句显示相关
@@ -82,102 +100,86 @@ class _ReviewPageState extends State<ReviewPage>
     );
   }
 
+  @override
+  void dispose() {
+    // 保存复习状态
+    _saveReviewState();
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  // 保存复习状态
+  Future<void> _saveReviewState() async {
+    if (_reviewContainer.isNotEmpty || _originalContainer.isNotEmpty) {
+      await ProgressPersistenceService.instance.saveSessionState({
+        'reviewContainer': _reviewContainer,
+        'originalContainer': _originalContainer,
+        'continuousCorrectCount': _continuousCorrectCount,
+        'masteredWords': _masteredWords,
+        'isShuffleGenerated': _isShuffleGenerated,
+        'shuffledWordIds': _shuffledWordIds,
+      });
+    }
+  }
+
   // 加载数据
   Future<void> _loadData() async {
     setState(() {
       _isLoading = true;
     });
 
-    // 使用进度持久化服务加载数据
-    final sessionState = await ProgressPersistenceService.instance
-        .loadSessionState();
-    _words = sessionState['words'] as List<Word>;
-    _progress = sessionState['progress'] as StudyProgress;
+    // 初始化DataManager
+    await DataManager.instance.initialize();
+
+    // 使用DataManager加载数据
+    _words = await DataManager.instance.getAllWords();
+    _progress = await DataManager.instance.getStudyProgress();
     _settings = await Settings.load();
-    _currentWordList = await WordListStorage.getCurrentWordList();
+    _currentWordList =
+        await DataManager.instance.getCurrentWordList() ??
+        WordList(id: 1, name: '默认单词表', isCurrent: true);
 
     // 过滤出当前单词表中的单词
     _filteredWords = _words
         .where((word) => _currentWordList.wordIds.contains(word.id))
         .toList();
 
-    // 过滤出需要复习的单词（状态为 familiar 的单词）
-    final reviewWords = _filteredWords
-        .where((word) => word.status == StudyStatus.familiar)
-        .toList();
-
-    // 根据设置中的排序选项排序单词
-    _sortWords(reviewWords);
-
-    // 如果当前单词表中没有需要复习的单词，使用所有需要复习的单词
-    final wordsToUse = reviewWords.isNotEmpty
-        ? reviewWords
-        : _words.where((word) => word.status == StudyStatus.familiar).toList();
-
-    // 如果没有需要复习的单词，使用模拟数据
-    if (wordsToUse.isEmpty) {
-      _words = [
-        Word(
-          id: 1,
-          word: 'beneficial',
-          phonetic: '/ˌbenɪˈfɪʃl/',
-          meaning: 'adj. 有益的，有利的',
-          example: 'This medicine has a beneficial effect on the patient.',
-          status: StudyStatus.familiar,
-        ),
-        Word(
-          id: 2,
-          word: 'confident',
-          phonetic: '/ˈkɒnfɪdənt/',
-          meaning: 'adj. 自信的，确信的',
-          example: 'She is confident of winning the race.',
-          status: StudyStatus.familiar,
-        ),
-        Word(
-          id: 3,
-          word: 'dependent',
-          phonetic: '/dɪˈpendənt/',
-          meaning: 'adj. 依赖的，依靠的',
-          example: 'The child is dependent on his parents.',
-          status: StudyStatus.familiar,
-        ),
-        Word(
-          id: 4,
-          word: 'efficient',
-          phonetic: '/ɪˈfɪʃnt/',
-          meaning: 'adj. 效率高的，有能力的',
-          example: 'The new machine is more efficient than the old one.',
-          status: StudyStatus.familiar,
-        ),
-        Word(
-          id: 5,
-          word: 'aggressive',
-          phonetic: '/əˈɡresɪv/',
-          meaning: 'adj. 好斗的，有侵略性的；进取的',
-          example: 'He has an aggressive personality.',
-          status: StudyStatus.familiar,
-        ),
-      ];
-      _filteredWords = _words;
+    // 尝试加载之前保存的复习状态
+    final sessionState = await ProgressPersistenceService.instance
+        .loadSessionState();
+    bool hasSavedState = false;
+    if (sessionState.containsKey('reviewContainer') &&
+        sessionState['reviewContainer'] is List<Word>) {
+      _reviewContainer = sessionState['reviewContainer'] as List<Word>;
+      _originalContainer = sessionState['originalContainer'] as List<Word>;
+      _continuousCorrectCount =
+          sessionState['continuousCorrectCount'] as Map<int, int>;
+      _masteredWords = sessionState['masteredWords'] as List<Word>;
+      _isShuffleGenerated = sessionState['isShuffleGenerated'] as bool ?? false;
+      _shuffledWordIds = sessionState['shuffledWordIds'] as List<int>?;
+      hasSavedState = true;
     }
 
-    // 实现分组逻辑
-    _wordGroups = [];
-    int groupSize = _settings.reviewGroupSize;
-    final targetWords = wordsToUse.isNotEmpty ? wordsToUse : _words;
-    for (int i = 0; i < targetWords.length; i += groupSize) {
-      int end = i + groupSize;
-      if (end > targetWords.length) {
-        end = targetWords.length;
-      }
-      _wordGroups.add(targetWords.sublist(i, end));
-    }
+    // 如果没有保存的状态，初始化容器管理
+    if (!hasSavedState) {
+      // 过滤出需要复习的单词（状态为 familiar 的单词）
+      final reviewWords = _filteredWords
+          .where((word) => word.status == StudyStatus.familiar)
+          .toList();
 
-    // 初始化分组索引
-    _currentGroup = 0;
-    _currentIndexInGroup = 0;
-    _groupStartTime = DateTime.now();
-    _groupCorrectCount = 0;
+      // 根据设置中的排序选项排序单词
+      _sortWords(reviewWords);
+
+      // 如果当前单词表中没有需要复习的单词，使用所有需要复习的单词
+      final wordsToUse = reviewWords.isNotEmpty
+          ? reviewWords
+          : _words
+                .where((word) => word.status == StudyStatus.familiar)
+                .toList();
+
+      // 初始化容器管理
+      _initReviewContainer(wordsToUse);
+    }
 
     setState(() {
       _isLoading = false;
@@ -192,16 +194,55 @@ class _ReviewPageState extends State<ReviewPage>
     }
 
     // 自动播放发音
-    if (_settings.autoPlayPronunciation &&
-        _wordGroups.isNotEmpty &&
-        _wordGroups[_currentGroup].isNotEmpty) {
+    if (_settings.autoPlayPronunciation && _reviewContainer.isNotEmpty) {
       _speakWord(_currentWord.word);
     }
   }
 
-  // 播放单词发音
-  Future<void> _speakWord(String word) async {
-    await AudioService().speak(word);
+  // 初始化复习容器
+  void _initReviewContainer(List<Word> wordsToUse) {
+    // 清空容器
+    _reviewContainer.clear();
+    _originalContainer.clear();
+    _continuousCorrectCount.clear();
+
+    // 根据用户设置的复习分组大小决定容器大小
+    int containerSize = _settings.reviewGroupSize;
+
+    // 从排序后的单词列表中提取单词
+    final targetWords = wordsToUse.isNotEmpty ? wordsToUse : _words;
+
+    // 限制容器大小不超过可用单词数
+    if (containerSize > targetWords.length) {
+      containerSize = targetWords.length;
+    }
+
+    // 通过复习算法从单词表中筛选需要复习的单词
+    for (int i = 0; i < containerSize; i++) {
+      if (i < targetWords.length) {
+        _reviewContainer.add(targetWords[i]);
+        _originalContainer.add(targetWords[i]);
+        // 初始化连续答对次数为0
+        _continuousCorrectCount[targetWords[i].id] = 0;
+      }
+    }
+
+    // 随机打乱容器中的单词顺序，确保抽取的随机性
+    _shuffleContainer();
+  }
+
+  // 打乱容器中的单词顺序
+  void _shuffleContainer() {
+    _reviewContainer.shuffle(_random);
+  }
+
+  // 随机抽取一个单词
+  Word _randomlySelectWord() {
+    if (_reviewContainer.isEmpty) {
+      return _currentWord;
+    }
+    int randomIndex = _random.nextInt(_reviewContainer.length);
+    return _reviewContainer[randomIndex];
   }
 
   // 排序单词
@@ -245,6 +286,11 @@ class _ReviewPageState extends State<ReviewPage>
     }
   }
 
+  // 播放单词发音
+  Future<void> _speakWord(String word) async {
+    await AudioService().speak(word);
+  }
+
   // 选择学习状态
   void _selectStatus(StudyStatus status) {
     setState(() {
@@ -256,207 +302,106 @@ class _ReviewPageState extends State<ReviewPage>
   void _nextWord() async {
     // 更新当前单词的学习状态
     _currentWord.updateStatus(_selectedStatus);
+    // 保存单词状态到数据库
+    await DataManager.instance.saveWord(_currentWord);
 
     // 记录复习详细信息
-    bool isCorrect = _selectedStatus == StudyStatus.mastered;
+    bool isCorrect =
+        _selectedStatus == StudyStatus.mastered ||
+        _selectedStatus == StudyStatus.familiar;
     _progress.recordReview(_currentWord.id, isCorrect, _currentWord.status);
 
     // 保存学习进度
     _progress.updateWordsStudied(1, isCorrect);
     _progress.updateWordsReviewed(1);
-    await ProgressPersistenceService.instance.saveProgress(
-      progress: _progress,
-      words: _words,
-      currentWordIndex:
-          _currentGroup * _settings.reviewGroupSize + _currentIndexInGroup,
-      currentWordListId: _currentWordList.id.toString(),
-    );
+    // 保存进度到数据库
+    await DataManager.instance.saveStudyProgress(_progress);
 
-    // 更新分组正确计数
+    // 更新连续答对次数
     if (isCorrect) {
-      _groupCorrectCount++;
+      // 递增连续答对次数
+      int currentCount = _continuousCorrectCount[_currentWord.id] ?? 0;
+      currentCount++;
+      _continuousCorrectCount[_currentWord.id] = currentCount;
+
+      // 当连续答对次数达到3时，自动将该单词从当前容器中移除
+      if (currentCount >= 3) {
+        _reviewContainer.remove(_currentWord);
+        _masteredWords.add(_currentWord);
+      }
+    } else {
+      // 答错时重置连续答对次数为0
+      _continuousCorrectCount[_currentWord.id] = 0;
     }
 
-    // 检查是否达成今日学习任务
-    bool isTaskCompleted = _progress.todayWordsStudied >= _progress.dailyGoal;
+    // 检查容器是否为空
+    if (_reviewContainer.isEmpty) {
+      // 容器为空时触发拼写测试
+      _startSpellingTest();
+    } else {
+      // 从容器中随机抽取一个单词
+      _shuffleContainer();
 
-    // 判断是否完成了当前分组
-    if (_currentIndexInGroup == _wordGroups[_currentGroup].length - 1) {
-      // 检查是否完成了所有分组
-      bool isAllGroupsCompleted = _currentGroup == _wordGroups.length - 1;
+      // 切换到下一个单词
+      setState(() {
+        _selectedStatus = StudyStatus.learning;
+      });
 
-      // 如果达成今日学习任务或完成了所有分组，优先显示复习完成界面
-      if (isTaskCompleted || isAllGroupsCompleted) {
-        _showReviewSummary();
+      // 自动播放发音
+      if (_settings.autoPlayPronunciation) {
+        _speakWord(_currentWord.word);
+      }
+    }
+  }
+
+  // 开始拼写测试
+  void _startSpellingTest() {
+    setState(() {
+      _isSpellingTest = true;
+      _spellingTestIndex = 0;
+      _spellingInput = '';
+      _showCorrectSpelling = false;
+    });
+  }
+
+  // 下一个拼写测试单词
+  void _nextSpellingTestWord() {
+    setState(() {
+      _spellingTestIndex++;
+      _spellingInput = '';
+      _showCorrectSpelling = false;
+
+      // 检查是否完成所有拼写测试
+      if (_spellingTestIndex >= _originalContainer.length) {
+        _endSpellingTest();
+      }
+    });
+  }
+
+  // 结束拼写测试
+  void _endSpellingTest() {
+    setState(() {
+      _isSpellingTest = false;
+    });
+
+    // 显示学习小结
+    _showReviewSummary();
+  }
+
+  // 检查拼写
+  void _checkSpelling() {
+    if (_spellingTestIndex < _originalContainer.length) {
+      final currentTestWord = _originalContainer[_spellingTestIndex];
+      if (_spellingInput.toLowerCase() == currentTestWord.word.toLowerCase()) {
+        // 拼写正确，进入下一个单词
+        _nextSpellingTestWord();
       } else {
-        // 否则显示分组完成提示
-        _showGroupCompletion();
-      }
-    } else {
-      // 切换到当前分组的下一个单词
-      setState(() {
-        _currentIndexInGroup = _currentIndexInGroup + 1;
-        _selectedStatus = StudyStatus.learning;
-      });
-
-      // 自动播放发音
-      if (_settings.autoPlayPronunciation) {
-        _speakWord(_currentWord.word);
-      }
-    }
-  }
-
-  // 显示分组完成提示
-  void _showGroupCompletion() {
-    // 计算分组学习统计数据
-    int groupSize = _wordGroups[_currentGroup].length;
-    double accuracy = groupSize > 0
-        ? (_groupCorrectCount / groupSize) * 100
-        : 0;
-    int groupTime = DateTime.now().difference(_groupStartTime).inSeconds;
-
-    // 显示分组完成提示对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Center(
-          child: Text(
-            '分组完成',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.green,
-            ),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox(height: 20),
-            // 分组信息
-            Container(
-              padding: EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Column(
-                children: [
-                  Text(
-                    '第 ${_currentGroup + 1} 组复习已完成！',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
-                    ),
-                  ),
-                  SizedBox(height: 15),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildSummaryItem(
-                        '正确率',
-                        '${accuracy.toStringAsFixed(1)}%',
-                      ),
-                      _buildSummaryItem('用时', '${groupTime}秒'),
-                      _buildSummaryItem(
-                        '正确',
-                        '$_groupCorrectCount / $groupSize',
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 20),
-            // 学习建议
-            Text(
-              '继续保持，加油！',
-              style: TextStyle(fontSize: 16),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: [
-          // 使用Row和Expanded实现按钮对称分布
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              // 返回主页
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).pop();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text(
-                      '返回主页',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-              // 继续下一组
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _nextGroup();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    child: Text(
-                      '继续下一组',
-                      style: TextStyle(fontSize: 16, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 10),
-        ],
-      ),
-    );
-  }
-
-  // 进入下一组复习
-  void _nextGroup() {
-    // 判断是否完成了所有分组
-    if (_currentGroup == _wordGroups.length - 1) {
-      // 完成了所有分组，显示复习总结
-      _showReviewSummary();
-    } else {
-      // 进入下一组
-      setState(() {
-        _currentGroup = _currentGroup + 1;
-        _currentIndexInGroup = 0;
-        _groupStartTime = DateTime.now();
-        _groupCorrectCount = 0;
-        _selectedStatus = StudyStatus.learning;
-      });
-
-      // 自动播放发音
-      if (_settings.autoPlayPronunciation) {
-        _speakWord(_currentWord.word);
+        // 拼写错误，显示正确拼写，然后要求用户重新拼写
+        setState(() {
+          _showCorrectSpelling = true;
+          // 重置输入，让用户重新拼写
+          _spellingInput = '';
+        });
       }
     }
   }
@@ -503,11 +448,11 @@ class _ReviewPageState extends State<ReviewPage>
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildSummaryItem('总复习数', _words.length.toString()),
                       _buildSummaryItem(
-                        '完成复习',
-                        '${_progress.todayWordsReviewed}',
+                        '总单词数',
+                        _originalContainer.length.toString(),
                       ),
+                      _buildSummaryItem('掌握单词', '${_masteredWords.length}'),
                       _buildSummaryItem(
                         '今日目标',
                         '${_progress.todayWordsReviewed}/${_progress.dailyReviewGoal}',
@@ -518,7 +463,37 @@ class _ReviewPageState extends State<ReviewPage>
               ),
             ),
             SizedBox(height: 20),
-            // 复习建议
+            // 单词表格
+            Container(
+              width: double.infinity,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: DataTable(
+                  columns: [
+                    DataColumn(label: Text('单词')),
+                    DataColumn(label: Text('音标')),
+                    DataColumn(label: Text('释义')),
+                    DataColumn(label: Text('掌握情况')),
+                    DataColumn(label: Text('下次复习')),
+                  ],
+                  rows: _originalContainer.map((word) {
+                    bool isMastered = _masteredWords.contains(word);
+                    String reviewTime = _calculateReviewTime(word);
+                    return DataRow(
+                      cells: [
+                        DataCell(Text(word.word)),
+                        DataCell(Text(word.phonetic ?? '')),
+                        DataCell(Text(word.meaning)),
+                        DataCell(Text(isMastered ? '已掌握' : '学习中')),
+                        DataCell(Text(reviewTime)),
+                      ],
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            SizedBox(height: 20),
+            // 学习建议
             Text(
               '恭喜你完成了本次复习！',
               style: TextStyle(fontSize: 16),
@@ -545,13 +520,7 @@ class _ReviewPageState extends State<ReviewPage>
                     ),
                     onPressed: () {
                       Navigator.pop(context); // 关闭对话框
-                      // 判断是否可以返回（通过导航栈）
-                      if (Navigator.canPop(context)) {
-                        Navigator.pop(context); // 返回上一页
-                      } else {
-                        // 如果无法返回，说明是在PageView中，什么都不做
-                        // 继续留在当前页面
-                      }
+                      Navigator.pop(context); // 返回上一页
                     },
                     child: Text(
                       '返回',
@@ -612,6 +581,209 @@ class _ReviewPageState extends State<ReviewPage>
     );
   }
 
+  // 计算单词的下次复习时间
+  String _calculateReviewTime(Word word) {
+    if (word.status == StudyStatus.mastered) {
+      // 已掌握的单词，3天后复习
+      return '3天后';
+    } else if (word.status == StudyStatus.familiar) {
+      // 熟悉的单词，1天后复习
+      return '1天后';
+    } else {
+      // 学习中的单词，今天复习
+      return '今天';
+    }
+  }
+
+  // 显示底部上拉菜单
+  void _showBottomMenu() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20),
+          topRight: Radius.circular(20),
+        ),
+      ),
+      builder: (BuildContext context) {
+        return Container(
+          padding: EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 菜单标题
+              Text(
+                '复习选项',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+              ),
+
+              SizedBox(height: 20),
+
+              // 按钮1
+              _buildMenuButton(
+                '再听一遍发音',
+                () => _speakWord(_currentWord.word),
+                Colors.green,
+              ),
+
+              SizedBox(height: 15),
+
+              // 按钮2
+              _buildMenuButton('收藏该单词', () {
+                _currentWord.toggleFavorite();
+                // 保存单词状态到数据库
+                DataManager.instance.saveWord(_currentWord);
+                Navigator.pop(context);
+              }, Colors.purple),
+
+              SizedBox(height: 15),
+
+              // 按钮3
+              _buildMenuButton('查看详细释义', () {
+                _showWordDetails();
+                Navigator.pop(context);
+              }, Colors.blue),
+
+              SizedBox(height: 20),
+
+              // 取消按钮
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade200,
+                    borderRadius: BorderRadius.circular(25),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '取消',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 10),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 构建菜单按钮
+  Widget _buildMenuButton(String text, VoidCallback onTap, Color color) {
+    return GestureDetector(
+      onTap: () {
+        onTap();
+        Navigator.pop(context);
+      },
+      child: Container(
+        width: double.infinity,
+        height: 50,
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.3),
+              spreadRadius: 3,
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 显示单词详细信息
+  void _showWordDetails() {
+    final currentWord = _currentWord;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(currentWord.word),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              currentWord.phonetic ?? '',
+              style: TextStyle(
+                fontSize: 18,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            SizedBox(height: 15),
+            Text(currentWord.meaning, style: TextStyle(fontSize: 16)),
+            SizedBox(height: 15),
+            if (currentWord.example != null && currentWord.example!.isNotEmpty)
+              Text(
+                '例句: ${currentWord.example}',
+                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 切换例句显示状态
+  void _toggleExample() {
+    // 检查动画控制器是否正在运行或正在切换状态，如果是，则不执行任何操作
+    if (_animationController.isAnimating || _isToggling) {
+      return;
+    }
+
+    _isToggling = true;
+
+    if (_showExample) {
+      // 隐藏例句
+      _animationController.reverse().then((_) {
+        setState(() {
+          _showExample = false;
+        });
+        _isToggling = false;
+      });
+    } else {
+      // 显示例句
+      setState(() {
+        _showExample = true;
+      });
+      _animationController.forward().then((_) {
+        _isToggling = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -621,8 +793,7 @@ class _ReviewPageState extends State<ReviewPage>
     }
 
     // 检查当前单词表中是否有需要复习的单词
-    if (_wordGroups.isEmpty ||
-        (_wordGroups.length == 1 && _wordGroups[0].isEmpty)) {
+    if (_originalContainer.isEmpty) {
       return Scaffold(
         body: Container(
           color: Theme.of(context).scaffoldBackgroundColor,
@@ -674,7 +845,180 @@ class _ReviewPageState extends State<ReviewPage>
       );
     }
 
-    // 不再需要 currentWord 变量，直接使用 _currentWord getter 方法
+    // 拼写测试界面
+    if (_isSpellingTest) {
+      if (_spellingTestIndex >= _originalContainer.length) {
+        // 拼写测试完成，显示学习小结
+        _endSpellingTest();
+        return Container();
+      }
+
+      final currentTestWord = _originalContainer[_spellingTestIndex];
+
+      return Scaffold(
+        body: Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 顶部进度条
+                Container(
+                  padding: EdgeInsets.all(20),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 返回按钮
+                      IconButton(
+                        icon: Icon(Icons.arrow_back, color: Colors.black),
+                        onPressed: () {
+                          setState(() {
+                            _isSpellingTest = false;
+                          });
+                        },
+                      ),
+
+                      // 进度指示器
+                      Text(
+                        '拼写测试 ${_spellingTestIndex + 1}/${_originalContainer.length}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+
+                      // 更多选项
+                      IconButton(
+                        icon: Icon(Icons.more_vert, color: Colors.black),
+                        onPressed: _showBottomMenu,
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 拼写测试内容
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // 单词释义
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 40),
+                        child: Column(
+                          children: [
+                            Text(
+                              '请拼写以下单词:',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                            SizedBox(height: 20),
+                            Text(
+                              currentTestWord.meaning,
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.black,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            SizedBox(height: 40),
+
+                            // 发音按钮
+                            IconButton(
+                              icon: Icon(Icons.volume_up, size: 40),
+                              onPressed: () => _speakWord(currentTestWord.word),
+                              color: Colors.orange,
+                            ),
+                            SizedBox(height: 40),
+
+                            // 正确拼写提示
+                            if (_showCorrectSpelling)
+                              Container(
+                                padding: EdgeInsets.all(15),
+                                margin: EdgeInsets.symmetric(horizontal: 40),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade50,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.red,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Text(
+                                  '正确拼写: ${currentTestWord.word}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            SizedBox(height: 20),
+
+                            // 拼写输入框
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 40),
+                              child: TextField(
+                                onChanged: (value) {
+                                  setState(() {
+                                    _spellingInput = value;
+                                  });
+                                },
+                                onSubmitted: (value) {
+                                  _checkSpelling();
+                                },
+                                decoration: InputDecoration(
+                                  hintText: '请输入单词拼写',
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  contentPadding: EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 15,
+                                  ),
+                                ),
+                                style: TextStyle(fontSize: 18),
+                              ),
+                            ),
+                            SizedBox(height: 30),
+
+                            // 检查按钮
+                            Container(
+                              padding: EdgeInsets.symmetric(horizontal: 40),
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: _checkSpelling,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(25),
+                                  ),
+                                  padding: EdgeInsets.symmetric(vertical: 15),
+                                ),
+                                child: Text(
+                                  '检查拼写',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       // 使用主题背景色，移除黄色渐变
@@ -699,7 +1043,7 @@ class _ReviewPageState extends State<ReviewPage>
 
                     // 进度指示器
                     Text(
-                      '第 ${_currentGroup + 1} 组 ${_currentIndexInGroup + 1}/${_wordGroups[_currentGroup].length}',
+                      '复习 ${_originalContainer.length - _reviewContainer.length}/${_originalContainer.length}',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.grey.shade600,
@@ -710,6 +1054,30 @@ class _ReviewPageState extends State<ReviewPage>
                     IconButton(
                       icon: Icon(Icons.more_vert, color: Colors.black),
                       onPressed: _showBottomMenu,
+                    ),
+                  ],
+                ),
+              ),
+
+              // 单词进度信息
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '连续答对: ${_continuousCorrectCount[_currentWord.id] ?? 0}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
+                    ),
+                    Text(
+                      '还需答对: ${3 - (_continuousCorrectCount[_currentWord.id] ?? 0)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade600,
+                      ),
                     ),
                   ],
                 ),
@@ -1020,201 +1388,5 @@ class _ReviewPageState extends State<ReviewPage>
         ),
       ),
     );
-  }
-
-  // 显示底部上拉菜单
-  void _showBottomMenu() {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(20),
-          topRight: Radius.circular(20),
-        ),
-      ),
-      builder: (BuildContext context) {
-        return Container(
-          padding: EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 菜单标题
-              Text(
-                '复习选项',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-
-              SizedBox(height: 20),
-
-              // 按钮1
-              _buildMenuButton(
-                '再听一遍发音',
-                () => _speakWord(_currentWord.word),
-                Colors.green,
-              ),
-
-              SizedBox(height: 15),
-
-              // 按钮2
-              _buildMenuButton('收藏该单词', () {
-                _currentWord.toggleFavorite();
-                WordStorage.saveWords(_words);
-                Navigator.pop(context);
-              }, Colors.purple),
-
-              SizedBox(height: 15),
-
-              // 按钮3
-              _buildMenuButton('查看详细释义', () {
-                _showWordDetails();
-                Navigator.pop(context);
-              }, Colors.blue),
-
-              SizedBox(height: 20),
-
-              // 取消按钮
-              GestureDetector(
-                onTap: () => Navigator.pop(context),
-                child: Container(
-                  width: double.infinity,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '取消',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade600,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              SizedBox(height: 10),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  // 构建菜单按钮
-  Widget _buildMenuButton(String text, VoidCallback onTap, Color color) {
-    return GestureDetector(
-      onTap: () {
-        onTap();
-        Navigator.pop(context);
-      },
-      child: Container(
-        width: double.infinity,
-        height: 50,
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              spreadRadius: 3,
-              blurRadius: 10,
-              offset: Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            text,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // 显示单词详细信息
-  void _showWordDetails() {
-    // 这里可以实现显示单词详细信息的功能
-    // 例如显示释义、例句、相关词组等
-    final currentWord = _currentWord;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(currentWord.word),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              currentWord.phonetic ?? '',
-              style: TextStyle(
-                fontSize: 18,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey.shade600,
-              ),
-            ),
-            SizedBox(height: 15),
-            Text(currentWord.meaning, style: TextStyle(fontSize: 16)),
-            SizedBox(height: 15),
-            if (currentWord.example != null && currentWord.example!.isNotEmpty)
-              Text(
-                '例句: ${currentWord.example}',
-                style: TextStyle(fontSize: 14, color: Colors.grey.shade700),
-              ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 切换例句显示状态
-  void _toggleExample() {
-    // 检查动画控制器是否正在运行或正在切换状态，如果是，则不执行任何操作
-    if (_animationController.isAnimating || _isToggling) {
-      return;
-    }
-
-    _isToggling = true;
-
-    if (_showExample) {
-      // 隐藏例句
-      _animationController.reverse().then((_) {
-        setState(() {
-          _showExample = false;
-        });
-        _isToggling = false;
-      });
-    } else {
-      // 显示例句
-      setState(() {
-        _showExample = true;
-      });
-      _animationController.forward().then((_) {
-        _isToggling = false;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
   }
 }

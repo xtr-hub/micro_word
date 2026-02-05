@@ -256,6 +256,21 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     final wordLists = results[4] as List<WordList>;
     _testSettings = results[5] as TestSettings;
 
+    // 如果当前单词表的wordIds列表为空，将所有单词的ID添加到当前单词表中
+    if (_currentWordList.wordIds.isEmpty && _words.isNotEmpty) {
+      // 更新当前单词表的wordIds列表
+      _currentWordList.wordIds = _words.map((word) => word.id).toList();
+      
+      // 同时更新wordLists列表中的对应单词表
+      final index = wordLists.indexWhere((wl) => wl.id == _currentWordList.id);
+      if (index != -1) {
+        wordLists[index] = _currentWordList;
+      }
+      
+      // 保存更新后的单词表
+      await WordListStorage.saveWordLists(wordLists);
+    }
+
     // 根据传入的参数或保存的测试设置加载相应的单词
     if (widget.customWordListPath != null) {
       // 从自定义单词表文件加载单词

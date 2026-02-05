@@ -16,6 +16,9 @@ import 'word_list.dart';
 /// 单词表存储服务类
 import 'word_list_storage.dart';
 
+/// 数据管理服务
+import '../services/data_manager.dart';
+
 /// 单词存储服务类
 ///
 /// 功能：
@@ -47,17 +50,9 @@ class WordStorage {
   /// - Future<void>：异步操作，无返回值
   static Future<void> saveWords(List<Word> words) async {
     try {
-      /// 将单词列表转换为JSON格式
-      ///
-      /// 转换步骤：
-      /// 1. 使用map方法遍历单词列表，将每个Word对象转换为JSON Map（调用word.toJson()）
-      /// 2. 使用toList方法将结果转换为List<Map<String, dynamic>>
-      /// 3. 使用json.encode将List转换为JSON字符串
-      final jsonList = words.map((word) => word.toJson()).toList();
-      final jsonString = json.encode(jsonList);
-
-      /// 使用跨平台存储服务保存数据
-      await PlatformStorage.saveData('word_data', jsonString);
+      /// 使用DataManager保存单词数据
+      await DataManager.instance.initialize();
+      await DataManager.instance.saveWords(words);
     } catch (e) {
       /// 如果保存失败，打印错误信息
       ///
@@ -66,36 +61,30 @@ class WordStorage {
     }
   }
 
-  /// 从本地文件加载单词列表
+  /// 从数据库加载单词列表
   ///
   /// 功能：
-  /// - 从本地文件读取JSON字符串
-  /// - 将JSON字符串反序列化为单词列表
-  /// - 如果文件不存在或加载失败，返回默认单词列表
+  /// - 从数据库读取单词数据
+  /// - 如果数据库中没有数据，返回默认单词列表
   ///
   /// 返回值：
   /// - Future<List<Word>>：异步操作，返回包含所有单词的列表
   static Future<List<Word>> loadWords() async {
     try {
-      /// 使用跨平台存储服务加载数据
-      final jsonString = await PlatformStorage.loadData('word_data');
+      /// 使用DataManager加载单词数据
+      await DataManager.instance.initialize();
+      final words = await DataManager.instance.getAllWords();
 
-      /// 检查数据是否存在
-      if (jsonString == null) {
-        /// 如果数据不存在，返回默认单词列表
-        ///
-        /// 首次使用应用时，会返回包含50个默认单词的列表
-        return _getDefaultWords();
+      /// 如果数据库中没有数据，返回默认单词列表
+      if (words.isEmpty) {
+        final defaultWords = _getDefaultWords();
+
+        /// 保存默认单词到数据库
+        await DataManager.instance.saveWords(defaultWords);
+        return defaultWords;
       }
 
-      /// 解析JSON数据
-      ///
-      /// 解析步骤：
-      /// 1. 使用json.decode将JSON字符串转换为List<dynamic>
-      /// 2. 使用map方法遍历列表，将每个JSON Map转换为Word对象（调用Word.fromJson(json)）
-      /// 3. 使用toList方法将结果转换为List<Word>
-      final jsonList = json.decode(jsonString) as List<dynamic>;
-      return jsonList.map((json) => Word.fromJson(json)).toList();
+      return words;
     } catch (e) {
       /// 如果加载失败，打印错误信息
       debugPrint('加载单词数据失败: $e');
@@ -108,23 +97,22 @@ class WordStorage {
   /// 重置单词数据为默认的50个单词
   ///
   /// 功能：
-  /// - 删除现有的单词数据文件
-  /// - 保存新的50个默认单词到存储中
+  /// - 删除现有的单词数据
+  /// - 保存新的50个默认单词到数据库中
   /// - 用于强制更新为最新的默认单词列表
   ///
   /// 返回值：
   /// - Future<List<Word>>：异步操作，返回重置后的单词列表
   static Future<List<Word>> resetToDefaultWords() async {
     try {
-      /// 删除现有数据（如果存在）
-      await PlatformStorage.deleteData('word_data');
-      debugPrint('已删除现有数据文件');
+      /// 初始化DataManager
+      await DataManager.instance.initialize();
 
       /// 获取新的默认单词列表
       final defaultWords = _getDefaultWords();
 
-      /// 保存到文件
-      await saveWords(defaultWords);
+      /// 保存到数据库
+      await DataManager.instance.saveWords(defaultWords);
 
       /// 提取默认单词的ID列表
       final defaultWordIds = defaultWords.map((word) => word.id).toList();
@@ -133,28 +121,31 @@ class WordStorage {
       final wordLists = await WordListStorage.loadWordLists();
 
       /// 查找或创建默认单词表
-      WordList? defaultWordList;
+      WordList defaultWordList;
 
       /// 尝试查找名为"默认单词表"的单词表
-      defaultWordList = wordLists.firstWhere(
+      final existingIndex = wordLists.indexWhere(
         (list) => list.name == '默认单词表',
-        orElse: () => WordList(
-          id: DateTime.now().millisecondsSinceEpoch,
-          name: '默认单词表',
-          isCurrent: true,
-          wordIds: defaultWordIds,
-        ),
       );
 
-      /// 如果默认单词表不存在，添加到列表中
-      if (!wordLists.contains(defaultWordList)) {
-        wordLists.add(defaultWordList);
-      } else {
+      if (existingIndex != -1) {
         /// 如果默认单词表存在，更新其wordIds列表为所有默认单词的ID
+        defaultWordList = wordLists[existingIndex];
         defaultWordList.wordIds = defaultWordIds;
 
         /// 确保默认单词表被设置为当前学习内容
         defaultWordList.isCurrent = true;
+      } else {
+        /// 如果默认单词表不存在，创建一个新的
+        defaultWordList = WordList(
+          id: DateTime.now().millisecondsSinceEpoch,
+          name: '默认单词表',
+          isCurrent: true,
+          wordIds: defaultWordIds,
+        );
+
+        /// 添加到列表中
+        wordLists.add(defaultWordList);
       }
 
       /// 确保只有默认单词表被设置为当前学习内容

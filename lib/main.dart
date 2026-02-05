@@ -10,6 +10,9 @@ import 'package:provider/provider.dart';
 /// 主题提供者，用于管理应用的主题切换
 import 'providers/theme_provider.dart';
 
+/// 学习进度提供者，用于管理应用的学习进度状态
+import 'providers/study_progress_provider.dart';
+
 /// 主页面组件，包含底部导航栏和多个子页面
 import 'pages/home_page.dart';
 
@@ -87,16 +90,22 @@ void main() async {
   ///
   /// runApp函数是Flutter应用的启动点，它将根组件渲染到屏幕上
   runApp(
-    /// 使用ChangeNotifierProvider包装根组件
+    /// 使用MultiProvider包装根组件
     ///
-    /// Provider是Flutter中常用的状态管理库
-    /// ChangeNotifierProvider用于在组件树中共享可变化的状态
-    ChangeNotifierProvider(
-      /// 创建ThemeProvider实例
-      ///
-      /// create参数接收一个函数，该函数返回要共享的状态对象
-      /// 这里创建了一个ThemeProvider实例，用于管理应用主题
-      create: (_) => ThemeProvider(),
+    /// MultiProvider用于在组件树中同时共享多个可变化的状态
+    MultiProvider(
+      /// 提供多个状态管理器
+      providers: [
+        /// 创建ThemeProvider实例
+        ///
+        /// 用于管理应用主题
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+
+        /// 创建StudyProgressProvider实例
+        ///
+        /// 用于管理应用的学习进度状态
+        ChangeNotifierProvider(create: (_) => StudyProgressProvider()),
+      ],
 
       /// 根组件为WordApp
       ///

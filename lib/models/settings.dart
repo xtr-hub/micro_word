@@ -103,6 +103,7 @@ class Settings {
   int studyGroupSize; // 学习分组大小
   int reviewGroupSize; // 复习分组大小
   SortOption sortOption; // 排序方式
+  List<int>? shuffledWordIds; // 乱序单词ID列表
 
   Settings({
     this.autoPlayPronunciation = true,
@@ -111,6 +112,7 @@ class Settings {
     this.studyGroupSize = 5, // 默认学习分组大小为5
     this.reviewGroupSize = 20, // 默认复习分组大小为20
     this.sortOption = SortOption.word, // 默认排序方式为按单词排序
+    this.shuffledWordIds, // 默认乱序单词ID列表为null
   });
 
   factory Settings.fromJson(Map<String, dynamic> json) {
@@ -123,6 +125,9 @@ class Settings {
       studyGroupSize: json['studyGroupSize'] ?? 5,
       reviewGroupSize: json['reviewGroupSize'] ?? 20,
       sortOption: stringToSortOption(json['sortOption'] ?? 'word'),
+      shuffledWordIds: json['shuffledWordIds'] != null
+          ? List<int>.from(json['shuffledWordIds'])
+          : null,
     );
   }
 
@@ -134,6 +139,7 @@ class Settings {
       'studyGroupSize': studyGroupSize,
       'reviewGroupSize': reviewGroupSize,
       'sortOption': sortOptionToString(sortOption),
+      'shuffledWordIds': shuffledWordIds,
     };
   }
 

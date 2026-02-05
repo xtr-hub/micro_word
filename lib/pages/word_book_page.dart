@@ -67,8 +67,10 @@ class _WordBookPageState extends State<WordBookPage> {
     _wordLists = results[1] as List<WordList>;
     _settings = results[2] as Settings;
 
-    // 从设置中读取排序选项
+    // 从设置中读取排序选项和乱序顺序
     _sortOption = _settings.sortOption;
+    _shuffledWordIds = _settings.shuffledWordIds;
+    _isShuffleGenerated = _shuffledWordIds != null;
 
     // 找到当前单词表
     _currentWordList = _wordLists.firstWhere(
@@ -81,6 +83,21 @@ class _WordBookPageState extends State<WordBookPage> {
               isCurrent: true,
             ),
     );
+
+    // 如果当前单词表的wordIds列表为空，将所有单词的ID添加到当前单词表中
+    if (_currentWordList.wordIds.isEmpty && _words.isNotEmpty) {
+      // 更新当前单词表的wordIds列表
+      _currentWordList.wordIds = _words.map((word) => word.id).toList();
+
+      // 同时更新_wordLists列表中的对应单词表
+      final index = _wordLists.indexWhere((wl) => wl.id == _currentWordList.id);
+      if (index != -1) {
+        _wordLists[index] = _currentWordList;
+      }
+
+      // 保存更新后的单词表
+      await WordListStorage.saveWordLists(_wordLists);
+    }
 
     // 应用过滤条件
     _applyFilters();
@@ -155,6 +172,9 @@ class _WordBookPageState extends State<WordBookPage> {
       // 保存乱序顺序
       _shuffledWordIds = wordIds;
       _isShuffleGenerated = true;
+      // 持久化存储乱序顺序
+      _settings.shuffledWordIds = wordIds;
+      _settings.save();
     }
 
     // 如果已经有乱序顺序，根据该顺序排序
@@ -183,6 +203,9 @@ class _WordBookPageState extends State<WordBookPage> {
       // 重置乱序状态，因为不同单词表的乱序顺序应该不同
       _shuffledWordIds = null;
       _isShuffleGenerated = false;
+      // 同时重置设置中的乱序顺序
+      _settings.shuffledWordIds = null;
+      _settings.save();
     });
 
     // 重新应用过滤条件

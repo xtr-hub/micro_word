@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习进度扇形图
+import 'package:provider/provider.dart';
 import '../models/study_progress.dart';
+import '../providers/study_progress_provider.dart';
 import './study_page.dart';
 import './review_page.dart';
 import './test_page.dart';
@@ -40,160 +41,278 @@ class _HomePageState extends State<HomePage> {
 
   /// 底部导航栏点击事件处理函数
   void _onItemTapped(int index) {
+    debugPrint('底部导航栏被点击，索引: $index');
     setState(() {
       _selectedIndex = index;
-      _pageController.jumpToPage(index);
     });
+    _pageController.jumpToPage(index);
   }
 
-  // 学习进度数据
-  late StudyProgress _progress;
-  bool _isLoading = true;
+  // 本地状态
   bool _showCalendar = false;
   DateTime _selectedMonth = DateTime.now();
 
-  // 页面列表，按照顺序对应底部导航栏的选项
-  List<Widget>? _pages;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadProgress();
+  // 重新加载学习进度数据
+  Future<void> _reloadProgress() async {
+    debugPrint('重新加载学习进度数据');
+    final progressProvider = Provider.of<StudyProgressProvider>(context, listen: false);
+    await progressProvider.reloadProgress();
   }
 
-  // 加载学习进度数据
-  Future<void> _loadProgress() async {
-    _progress = await StudyProgress.load();
-
-    // 学习中心页面 - 包含Learn和Review按钮
-    Widget _learningCenter = Column(
-      // 使用主题背景色，移除黄色主题
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // 可滚动内容区域
-        Expanded(
-          child: SingleChildScrollView(
-            physics: BouncingScrollPhysics(),
-            padding: EdgeInsets.all(20),
+  // 构建学习中心页面
+  Widget _buildLearningCenter() {
+    debugPrint('构建学习中心页面');
+    
+    return Consumer<StudyProgressProvider>(
+      builder: (context, provider, child) {
+        final isLoading = provider.isLoading;
+        final progress = provider.progress;
+        
+        debugPrint('Consumer 构建学习中心页面，isLoading: $isLoading, progress: $progress');
+        
+        if (isLoading) {
+          return Center(
+            child: CircularProgressIndicator(color: Colors.blue),
+          );
+        } else if (progress == null) {
+          return Center(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 顶部区域 - 今日学习进度组件
-                Container(
-                  margin: EdgeInsets.only(bottom: 16),
-                  child: _buildStudyProgressPieChart(),
+                Text('加载失败，请重试'),
+                SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    debugPrint('点击重试按钮');
+                    _reloadProgress();
+                  },
+                  child: Text('重试'),
                 ),
-
-                // 根据签到状态决定显示内容
-                if (!_progress.isTodayCheckedIn())
-                  Container(
-                    margin: EdgeInsets.only(bottom: 20),
-                    child: Column(
-                      children: [
-                        // 签到按钮
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _progress.checkIn();
-                              _loadProgress();
-                            });
-                          },
-                          child: Text('今日签到'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
-                            foregroundColor: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 10),
-                        Text(
-                          '签到后可获得额外奖励',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                // 学习数据统计区域
-                Container(
-                  margin: EdgeInsets.only(bottom: 24),
-                  padding: EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 4,
-                        blurRadius: 12,
-                        offset: Offset(0, 2),
-                      ),
-                    ],
-                  ),
+              ],
+            ),
+          );
+        } else {
+          return Column(
+            // 使用主题背景色，移除黄色主题
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 可滚动内容区域
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: BouncingScrollPhysics(),
+                  padding: EdgeInsets.all(20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 日历图标和标题
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.calendar_today,
-                            size: 24,
-                            color: Colors.orange,
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            '学习记录',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
-                            ),
-                          ),
-                        ],
+                      // 顶部区域 - 今日学习进度组件
+                      Container(
+                        margin: EdgeInsets.only(bottom: 16),
+                        child: _buildStudyProgressPieChart(progress),
                       ),
-                      SizedBox(height: 12),
 
-                      // 连续学习天数
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(
-                            '${_progress.consecutiveDays}',
-                            style: TextStyle(
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.orange,
+                      // 根据签到状态决定显示内容
+                      if (!progress.isTodayCheckedIn())
+                        // 未签到时显示签到按钮
+                        Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: GestureDetector(
+                            onTap: () async {
+                              debugPrint('签到按钮被点击');
+                              final progressProvider = Provider.of<StudyProgressProvider>(context, listen: false);
+                              bool success = await progressProvider.checkIn();
+                              if (success) {
+                                // 签到成功，添加提示
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('签到成功！'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                debugPrint('签到成功');
+                              } else {
+                                // 已经签到过，添加提示
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('今天已经签到过了'),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                                debugPrint('今天已经签到过了');
+                              }
+                            },
+                            child: Container(
+                              width: 140,
+                              height: 140,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.95),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.orange.withOpacity(0.3),
+                                    spreadRadius: 12,
+                                    blurRadius: 20,
+                                    offset: Offset(0, 8),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.calendar_today,
+                                    size: 40,
+                                    color: Colors.orange,
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    '签到',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.orange,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    _getCurrentDate(),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          SizedBox(width: 4),
-                          Text(
-                            '天连续学习',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey.shade600,
+                        )
+                      else
+                        // 使用AnimatedCrossFade实现学习记录卡片和日历之间的平滑过渡
+                        AnimatedCrossFade(
+                          duration: Duration(milliseconds: 300),
+                          crossFadeState: _showCalendar
+                              ? CrossFadeState.showSecond
+                              : CrossFadeState.showFirst,
+                          firstChild: Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: GestureDetector(
+                              onTap: () {
+                                debugPrint('学习记录卡片被点击，开始处理点击事件');
+                                
+                                final startTime = DateTime.now();
+                                
+                                setState(() {
+                                  debugPrint('开始更新状态，设置_showCalendar = true');
+                                  _showCalendar = true;
+                                });
+                                
+                                final endTime = DateTime.now();
+                                final duration = endTime.difference(startTime);
+                                debugPrint('状态更新完成，耗时: ${duration.inMilliseconds}ms');
+                                debugPrint('点击事件处理完成');
+                              },
+                              child: Container(
+                                width: 180,
+                                height: 120,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.95),
+                                  borderRadius: BorderRadius.circular(16),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.orange.withOpacity(0.1),
+                                      spreadRadius: 2,
+                                      blurRadius: 6,
+                                      offset: Offset(0, 0),
+                                    ),
+                                  ],
+                                  border: Border.all(
+                                    color: Colors.orange.withOpacity(0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    // 日历图标和标题
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.calendar_today,
+                                          size: 24,
+                                          color: Colors.orange,
+                                        ),
+                                        SizedBox(width: 8),
+                                        Text(
+                                          '学习记录',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    SizedBox(height: 12),
+
+                                    // 连续学习天数
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.baseline,
+                                      textBaseline: TextBaseline.alphabetic,
+                                      children: [
+                                        Text(
+                                          '${progress.consecutiveDays}',
+                                          style: TextStyle(
+                                            fontSize: 36,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.orange,
+                                          ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          '天连续学习',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.grey.shade600,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
-                        ],
-                      ),
+                          secondChild: _buildStudyCalendar(progress),
+                        ),
+
+                      // 学习统计卡片
+                      _buildStudyStats(progress),
                     ],
                   ),
                 ),
+              ),
 
-                // 两个主要按钮 - Learn和Review
-                Row(
+              // 底部操作按钮区域
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     // Learn按钮
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        debugPrint('Learn按钮被点击');
+                        // 导航到学习页面，并等待返回
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => StudyPage()),
                         );
+                        // 当用户从学习页面返回时，重新加载学习进度数据
+                        _reloadProgress();
                       },
                       child: Container(
                         width: 150,
@@ -211,7 +330,6 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                         child: Stack(
-                          alignment: Alignment.center,
                           children: [
                             Align(
                               alignment: Alignment.center,
@@ -231,7 +349,7 @@ class _HomePageState extends State<HomePage> {
                                 padding: EdgeInsets.only(bottom: 8, right: 12),
                                 child: Text(
                                   // 计算未完成的学习量：每日学习目标 - 今日已学习单词数
-                                  '${(_progress.dailyGoal - _progress.todayWordsStudied).clamp(0, _progress.dailyGoal)}',
+                                  '${(progress.dailyGoal - progress.todayWordsStudied).clamp(0, progress.dailyGoal)}',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.white.withOpacity(0.8),
@@ -246,11 +364,15 @@ class _HomePageState extends State<HomePage> {
 
                     // Review按钮
                     GestureDetector(
-                      onTap: () {
-                        Navigator.push(
+                      onTap: () async {
+                        debugPrint('Review按钮被点击');
+                        // 导航到复习页面，并等待返回
+                        await Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => ReviewPage()),
                         );
+                        // 当用户从复习页面返回时，重新加载学习进度数据
+                        _reloadProgress();
                       },
                       child: Container(
                         width: 150,
@@ -268,7 +390,6 @@ class _HomePageState extends State<HomePage> {
                           ],
                         ),
                         child: Stack(
-                          alignment: Alignment.center,
                           children: [
                             Align(
                               alignment: Alignment.center,
@@ -288,7 +409,7 @@ class _HomePageState extends State<HomePage> {
                                 padding: EdgeInsets.only(bottom: 8, right: 12),
                                 child: Text(
                                   // 计算未完成的复习量：每日复习目标 - 今日已复习单词数
-                                  '${(_progress.dailyReviewGoal - _progress.todayWordsReviewed).clamp(0, _progress.dailyReviewGoal)}',
+                                  '${(progress.dailyReviewGoal - progress.todayWordsReviewed).clamp(0, progress.dailyReviewGoal)}',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Colors.white.withOpacity(0.8),
@@ -302,430 +423,33 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
-
-                SizedBox(height: 24),
-
-                // 学习日历和学习记录图表部分
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // 日历和图表切换按钮
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _showCalendar = true;
-                            });
-                          },
-                          child: Text('学习日历'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _showCalendar
-                                ? Colors.blue
-                                : Colors.grey.shade300,
-                            foregroundColor: _showCalendar
-                                ? Colors.white
-                                : Colors.black,
-                          ),
-                        ),
-                        SizedBox(width: 10),
-                        ElevatedButton(
-                          onPressed: () {
-                            setState(() {
-                              _showCalendar = false;
-                            });
-                          },
-                          child: Text('学习统计'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: !_showCalendar
-                                ? Colors.blue
-                                : Colors.grey.shade300,
-                            foregroundColor: !_showCalendar
-                                ? Colors.white
-                                : Colors.black,
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    SizedBox(height: 16),
-
-                    // 根据选择显示日历或图表
-                    if (_showCalendar)
-                      Container(height: 300, child: _buildStudyCalendar())
-                    else
-                      Container(height: 300, child: _buildStudyChart()),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+              ),
+            ],
+          );
+        }
+      },
     );
-
-    // 初始化或更新页面列表
-    if (_pages == null || _pages!.isEmpty) {
-      // 如果_pages为空，初始化整个列表
-      _pages = [
-        _learningCenter, // 学习中心页面，包含Learn和Review按钮
-        TestPage(),
-        WordBookPage(),
-        SettingsPage(
-          onSettingsSaved: () {
-            // 重新加载学习进度数据
-            _loadProgress();
-          },
-        ),
-      ];
-    } else {
-      // 如果_pages已存在，只更新学习中心页面
-      _pages![0] = _learningCenter;
-    }
-
-    setState(() {
-      _isLoading = false;
-    });
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('HomePage build 被调用，_selectedIndex: $_selectedIndex');
     // 页面标题映射，根据当前选中的索引显示对应的标题
     final List<String> pageTitles = ['学习中心', '测试', '单词本', '设置'];
 
-    // 学习中心页面 - 包含Learn和Review按钮
-    Widget _learningCenter;
-    if (_isLoading) {
-      _learningCenter = Center(
-        child: CircularProgressIndicator(color: Colors.blue),
-      );
-    } else {
-      _learningCenter = Column(
-        // 使用主题背景色，移除黄色主题
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 可滚动内容区域
-          Expanded(
-            child: SingleChildScrollView(
-              physics: BouncingScrollPhysics(),
-              padding: EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // 顶部区域 - 今日学习进度组件
-                  Container(
-                    margin: EdgeInsets.only(bottom: 16),
-                    child: _buildStudyProgressPieChart(),
-                  ),
-
-                  // 根据签到状态决定显示内容
-                  if (!_progress.isTodayCheckedIn())
-                    // 未签到时显示签到按钮
-                    Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: GestureDetector(
-                        onTap: () {
-                          // 使用新的签到逻辑
-                          bool success = _progress.checkIn();
-                          if (success) {
-                            setState(() {
-                              // 签到成功，刷新数据
-                            });
-                            // 可以添加签到成功的提示
-                            debugPrint('签到成功');
-                          } else {
-                            // 已经签到过，添加提示
-                            debugPrint('今天已经签到过了');
-                          }
-                        },
-                        child: Container(
-                          width: 140,
-                          height: 140,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white.withOpacity(0.95),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.orange.withOpacity(0.3),
-                                spreadRadius: 12,
-                                blurRadius: 20,
-                                offset: Offset(0, 8),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.calendar_today,
-                                size: 40,
-                                color: Colors.orange,
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                '签到',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.orange,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                _getCurrentDate(),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    )
-                  else
-                    // 使用AnimatedCrossFade实现学习记录卡片和日历之间的平滑过渡
-                    AnimatedCrossFade(
-                      duration: Duration(milliseconds: 300),
-                      crossFadeState: _showCalendar
-                          ? CrossFadeState.showSecond
-                          : CrossFadeState.showFirst,
-                      firstChild: Padding(
-                        padding: EdgeInsets.symmetric(vertical: 16),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _showCalendar = true;
-                            });
-                          },
-                          child: Container(
-                            width: 180,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.95),
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.orange.withOpacity(0.1),
-                                  spreadRadius: 2,
-                                  blurRadius: 6,
-                                  offset: Offset(0, 0),
-                                ),
-                              ],
-                              border: Border.all(
-                                color: Colors.orange.withOpacity(0.2),
-                                width: 1,
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                // 日历图标和标题
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.calendar_today,
-                                      size: 24,
-                                      color: Colors.orange,
-                                    ),
-                                    SizedBox(width: 8),
-                                    Text(
-                                      '学习记录',
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: 12),
-
-                                // 连续学习天数
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.baseline,
-                                  textBaseline: TextBaseline.alphabetic,
-                                  children: [
-                                    Text(
-                                      '${_progress.consecutiveDays}',
-                                      style: TextStyle(
-                                        fontSize: 36,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.orange,
-                                      ),
-                                    ),
-                                    SizedBox(width: 4),
-                                    Text(
-                                      '天连续学习',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      secondChild: _buildStudyCalendar(),
-                    ),
-
-                  // 学习统计卡片
-                  _buildStudyStats(),
-                ],
-              ),
-            ),
-          ),
-
-          // 底部操作按钮区域
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Learn按钮
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => StudyPage()),
-                    );
-                  },
-                  child: Container(
-                    width: 150,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Color(0xFF4A90E2),
-                      borderRadius: BorderRadius.circular(35),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.blue.withOpacity(0.3),
-                          spreadRadius: 8,
-                          blurRadius: 15,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Learn',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        // 未完成学习量，显示在右下方
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: Padding(
-                            padding: EdgeInsets.only(bottom: 8, right: 12),
-                            child: Text(
-                              // 计算未完成的学习量：每日学习目标 - 今日已学习单词数
-                              '${(_progress.dailyGoal - _progress.todayWordsStudied).clamp(0, _progress.dailyGoal)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withOpacity(0.8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Review按钮
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ReviewPage()),
-                    );
-                  },
-                  child: Container(
-                    width: 150,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Color(0xFF50C878),
-                      borderRadius: BorderRadius.circular(35),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.green.withOpacity(0.3),
-                          spreadRadius: 8,
-                          blurRadius: 15,
-                          offset: Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Stack(
-                      children: [
-                        Align(
-                          alignment: Alignment.center,
-                          child: Text(
-                            'Review',
-                            style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        // 未完成复习量，显示在右下方
-                        Align(
-                          alignment: Alignment.bottomRight,
-                          child: Padding(
-                            padding: EdgeInsets.only(bottom: 8, right: 12),
-                            child: Text(
-                              // 计算未完成的复习量：每日复习目标 - 今日已复习单词数
-                              '${(_progress.dailyReviewGoal - _progress.todayWordsReviewed).clamp(0, _progress.dailyReviewGoal)}',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withOpacity(0.8),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    // 确保 _pages 列表已经初始化
-    if (_pages == null || _pages!.isEmpty) {
-      _pages = [
-        _learningCenter, // 学习中心页面，包含Learn和Review按钮
-        TestPage(),
-        WordBookPage(),
-        SettingsPage(
-          onSettingsSaved: () {
-            // 重新加载学习进度数据
-            _loadProgress();
-          },
-        ),
-      ];
-    } else {
-      // 更新学习中心页面
-      _pages![0] = _learningCenter;
-    }
+    // 构建页面列表
+    final pages = [
+      _buildLearningCenter(), // 学习中心页面，包含Learn和Review按钮
+      TestPage(),
+      WordBookPage(),
+      SettingsPage(
+        onSettingsSaved: () {
+          // 重新加载学习进度数据
+          debugPrint('设置保存后重新加载学习进度数据');
+          _reloadProgress();
+        },
+      ),
+    ];
 
     // 构建整个页面的UI
     return Scaffold(
@@ -758,23 +482,11 @@ class _HomePageState extends State<HomePage> {
                   );
                   // 如果返回了设置结果，通知测试页面更新
                   if (result != null &&
-                      result is Map &&
-                      _pages != null &&
-                      _pages!.length > 1 &&
-                      _pages![1] is TestPage) {
+                      result is Map) {
                     debugPrint('HomePage: 接收设置数据: $result');
-                    // 这里需要一个方法来更新测试页面的状态
-                    // 由于TestPage是在_pages列表中创建的，我们需要一种方式来通知它
-                    // 最简单的方法是重新创建TestPage实例
-                    // 添加UniqueKey()确保PageView重新创建组件而不是使用缓存
+                    // 重新构建测试页面
                     setState(() {
-                      _pages![1] = TestPage(
-                        key: UniqueKey(),
-                        testWordCount: result['testWordCount'] ?? 10,
-                        selectedWordList: result['selectedWordList'],
-                        customWordListPath: result['customWordListPath'],
-                      );
-                      debugPrint('HomePage: 已更新TestPage实例');
+                      _selectedIndex = 1;
                     });
 
                     // 确保在状态更新后再跳转页面
@@ -809,12 +521,13 @@ class _HomePageState extends State<HomePage> {
         controller: _pageController,
         // 页面切换时的回调函数，用于更新底部导航栏的选中状态
         onPageChanged: (index) {
+          debugPrint('PageView onPageChanged: $index');
           setState(() {
             _selectedIndex = index;
           });
         },
         // 页面列表
-        children: _pages ?? [],
+        children: pages,
       ),
 
       // 底部导航栏
@@ -868,7 +581,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 构建学习统计卡片
-  Widget _buildStudyStats() {
+  Widget _buildStudyStats(StudyProgress progress) {
+    debugPrint('构建学习统计卡片');
     return Container(
       margin: EdgeInsets.symmetric(horizontal: 15, vertical: 10),
       padding: EdgeInsets.all(16),
@@ -910,7 +624,7 @@ class _HomePageState extends State<HomePage> {
               _buildStatItem(
                 icon: Icons.book,
                 title: '总学习单词',
-                value: '${_progress.totalWordsStudied}',
+                value: '${progress.totalWordsStudied}',
                 color: Colors.blue,
               ),
 
@@ -918,7 +632,7 @@ class _HomePageState extends State<HomePage> {
               _buildStatItem(
                 icon: Icons.star,
                 title: '已掌握单词',
-                value: '${_progress.masteredWords}',
+                value: '${progress.masteredWords}',
                 color: Colors.orange,
               ),
 
@@ -927,7 +641,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icons.access_time,
                 title: '总学习时长',
                 value:
-                    '${(_progress.totalStudyTime / 3600).toStringAsFixed(1)}小时',
+                    '${(progress.totalStudyTime / 3600).toStringAsFixed(1)}小时',
                 color: Colors.green,
               ),
 
@@ -935,7 +649,7 @@ class _HomePageState extends State<HomePage> {
               _buildStatItem(
                 icon: Icons.refresh,
                 title: '待复习单词',
-                value: '${_progress.reviewWords}',
+                value: '${progress.reviewWords}',
                 color: Colors.purple,
               ),
             ],
@@ -982,7 +696,8 @@ class _HomePageState extends State<HomePage> {
   }
 
   // 构建学习日历
-  Widget _buildStudyCalendar() {
+  Widget _buildStudyCalendar(StudyProgress progress) {
+    debugPrint('构建学习日历');
     final monthNames = [
       '一月',
       '二月',
@@ -1000,7 +715,7 @@ class _HomePageState extends State<HomePage> {
     final weekDays = ['日', '一', '二', '三', '四', '五', '六'];
 
     // 获取当前月份的签到记录
-    final checkInRecords = _progress.getCheckInRecordsForMonth(
+    final checkInRecords = progress.getCheckInRecordsForMonth(
       _selectedMonth.year,
       _selectedMonth.month,
     );
@@ -1171,49 +886,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 构建学习统计图表
-  Widget _buildStudyChart() {
-    // 简单的学习统计图表实现
-    return Container(
-      padding: EdgeInsets.all(16),
-      margin: EdgeInsets.symmetric(horizontal: 15, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            spreadRadius: 3,
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          // 图表标题
-          Text(
-            '学习统计图表',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.blue,
-            ),
-          ),
-          SizedBox(height: 20),
-          // 简单的柱状图占位符
-          Container(height: 200, child: Center(child: Text('学习统计图表将在此显示'))),
-        ],
-      ),
-    );
-  }
-
   // 构建今日学习进度组件 - 使用水平进度条设计
-  Widget _buildStudyProgressPieChart() {
+  Widget _buildStudyProgressPieChart(StudyProgress progress) {
+    debugPrint('构建今日学习进度组件');
     // 计算学习进度百分比
-    final studyProgress = _progress.todayWordsStudied / _progress.dailyGoal;
+    final studyProgress = progress.todayWordsStudied / progress.dailyGoal;
     final reviewProgress =
-        _progress.todayWordsReviewed / _progress.dailyReviewGoal;
+        progress.todayWordsReviewed / progress.dailyReviewGoal;
 
     // 确保进度不超过100%
     final clampedStudyProgress = studyProgress.clamp(0.0, 1.0);
@@ -1257,8 +936,8 @@ class _HomePageState extends State<HomePage> {
           _buildProgressBar(
             title: '学习',
             progress: clampedStudyProgress,
-            current: _progress.todayWordsStudied,
-            total: _progress.dailyGoal,
+            current: progress.todayWordsStudied,
+            total: progress.dailyGoal,
             color: Color(0xFF667eea),
             backgroundColor: Color(0xFFe6e9f0),
             icon: Icons.book,
@@ -1269,8 +948,8 @@ class _HomePageState extends State<HomePage> {
           _buildProgressBar(
             title: '复习',
             progress: clampedReviewProgress,
-            current: _progress.todayWordsReviewed,
-            total: _progress.dailyReviewGoal,
+            current: progress.todayWordsReviewed,
+            total: progress.dailyReviewGoal,
             color: Color(0xFFf093fb),
             backgroundColor: Color(0xFFfce4ec),
             icon: Icons.refresh,

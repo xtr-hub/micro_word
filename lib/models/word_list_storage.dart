@@ -7,6 +7,9 @@ import 'package:flutter/foundation.dart';
 /// 跨平台存储服务
 import '../services/platform_storage.dart';
 
+/// 数据管理服务
+import '../services/data_manager.dart';
+
 /// WordList模型类，定义了单词表的数据结构
 import 'word_list.dart';
 
@@ -28,11 +31,10 @@ class WordListStorage {
   /// 文件路径：应用文档目录/word_list_data.json
   static const String _fileName = 'word_list_data.json';
 
-  /// 保存单词表列表到本地文件
+  /// 保存单词表列表到数据库
   ///
   /// 功能：
-  /// - 将单词表列表序列化为JSON字符串
-  /// - 将JSON字符串写入到本地文件
+  /// - 将单词表列表保存到数据库中
   /// - 用于持久化保存所有单词表数据
   ///
   /// 参数：
@@ -42,17 +44,11 @@ class WordListStorage {
   /// - Future<void>：异步操作，无返回值
   static Future<void> saveWordLists(List<WordList> wordLists) async {
     try {
-      /// 将单词表列表转换为JSON格式
-      ///
-      /// 转换步骤：
-      /// 1. 使用map方法遍历单词表列表，将每个WordList对象转换为JSON Map（调用wordList.toJson()）
-      /// 2. 使用toList方法将结果转换为List<Map<String, dynamic>>
-      /// 3. 使用json.encode将List转换为JSON字符串
-      final jsonList = wordLists.map((wordList) => wordList.toJson()).toList();
-      final jsonString = json.encode(jsonList);
-
-      /// 使用跨平台存储服务保存数据
-      await PlatformStorage.saveData('word_list_data', jsonString);
+      /// 使用DataManager保存单词表数据
+      await DataManager.instance.initialize();
+      for (final wordList in wordLists) {
+        await DataManager.instance.saveWordList(wordList);
+      }
     } catch (e) {
       /// 如果保存失败，打印错误信息
       ///
@@ -61,36 +57,32 @@ class WordListStorage {
     }
   }
 
-  /// 从本地文件加载单词表列表
+  /// 从数据库加载单词表列表
   ///
   /// 功能：
-  /// - 从本地文件读取JSON字符串
-  /// - 将JSON字符串反序列化为单词表列表
-  /// - 如果文件不存在或加载失败，返回默认单词表列表
+  /// - 从数据库读取单词表数据
+  /// - 如果数据库中没有数据，返回默认单词表列表
   ///
   /// 返回值：
   /// - Future<List<WordList>>：异步操作，返回包含所有单词表的列表
   static Future<List<WordList>> loadWordLists() async {
     try {
-      /// 使用跨平台存储服务加载数据
-      final jsonString = await PlatformStorage.loadData('word_list_data');
+      /// 使用DataManager加载单词表数据
+      await DataManager.instance.initialize();
+      final wordLists = await DataManager.instance.getAllWordLists();
 
-      /// 检查数据是否存在
-      if (jsonString == null) {
-        /// 如果数据不存在，返回默认单词表列表
-        ///
-        /// 首次使用应用时，会返回包含一个默认单词表的列表
-        return _getDefaultWordLists();
+      /// 如果数据库中没有数据，返回默认单词表列表
+      if (wordLists.isEmpty) {
+        final defaultWordLists = _getDefaultWordLists();
+
+        /// 保存默认单词表到数据库
+        for (final wordList in defaultWordLists) {
+          await DataManager.instance.saveWordList(wordList);
+        }
+        return defaultWordLists;
       }
 
-      /// 解析JSON数据
-      ///
-      /// 解析步骤：
-      /// 1. 使用json.decode将JSON字符串转换为List<dynamic>
-      /// 2. 使用map方法遍历列表，将每个JSON Map转换为WordList对象（调用WordList.fromJson(json)）
-      /// 3. 使用toList方法将结果转换为List<WordList>
-      final jsonList = json.decode(jsonString) as List<dynamic>;
-      return jsonList.map((json) => WordList.fromJson(json)).toList();
+      return wordLists;
     } catch (e) {
       /// 如果加载失败，打印错误信息
       debugPrint('加载单词表数据失败: $e');
@@ -236,25 +228,30 @@ class WordListStorage {
   /// 获取当前学习的单词表
   ///
   /// 功能：
-  /// - 加载现有单词表列表
-  /// - 查找isCurrent为true的单词表
-  /// - 如果没有找到，返回第一个单词表
+  /// - 从数据库获取当前学习的单词表
+  /// - 如果没有找到，返回默认单词表
   ///
   /// 返回值：
   /// - Future<WordList>：异步操作，返回当前学习的单词表
   static Future<WordList> getCurrentWordList() async {
-    /// 加载现有单词表列表
-    final wordLists = await loadWordLists();
+    try {
+      /// 使用DataManager获取当前单词表
+      await DataManager.instance.initialize();
+      final currentWordList = await DataManager.instance.getCurrentWordList();
+      if (currentWordList != null) {
+        return currentWordList;
+      }
+    } catch (e) {
+      debugPrint('获取当前单词表失败: $e');
+    }
 
-    /// 查找isCurrent为true的单词表
-    final currentWordList = wordLists.firstWhere(
+    /// 如果获取失败，使用默认方式
+    final wordLists = await loadWordLists();
+    return wordLists.firstWhere(
       (wordList) => wordList.isCurrent,
       orElse: () =>
           wordLists.isNotEmpty ? wordLists[0] : _getDefaultWordLists()[0],
     );
-
-    /// 返回当前学习的单词表
-    return currentWordList;
   }
 
   /// 设置当前学习的单词表
