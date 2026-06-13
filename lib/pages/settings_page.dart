@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习数据
 import 'package:provider/provider.dart'; // 状态管理库，用于主题切换
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
+import '../services/word_storage.dart'; // 单词存储服务
 import '../providers/theme_provider.dart'; // 主题状态管理
 
 /// 设置页面
@@ -14,7 +15,12 @@ import '../providers/theme_provider.dart'; // 主题状态管理
 /// - 学习统计数据
 /// - 学习数据分析（饼图和柱状图）
 class SettingsPage extends StatefulWidget {
+  /// 设置保存成功回调函数
+  final Function? onSettingsSaved;
+
   /// 创建页面状态对象
+  const SettingsPage({Key? key, this.onSettingsSaved}) : super(key: key);
+
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
@@ -30,6 +36,9 @@ class _SettingsPageState extends State<SettingsPage> {
   /// 每天学习目标单词数
   int _dailyGoal = 20;
 
+  /// 每天复习目标单词数
+  int _dailyReviewGoal = 50;
+
   /// 主题模式（浅色、深色或跟随系统）
   late ThemeMode _themeMode;
 
@@ -41,6 +50,15 @@ class _SettingsPageState extends State<SettingsPage> {
 
   /// 当前发音类型
   PronunciationType _pronunciationType = PronunciationType.american;
+
+  /// 学习分组大小
+  int _studyGroupSize = 5;
+
+  /// 复习分组大小
+  int _reviewGroupSize = 20;
+
+  /// 排序选项
+  SortOption _sortOption = SortOption.word;
 
   /// 数据加载状态
   bool _isLoading = true;
@@ -75,12 +93,16 @@ class _SettingsPageState extends State<SettingsPage> {
     // 加载学习进度数据
     _progress = await StudyProgress.load();
     _dailyGoal = _progress.dailyGoal; // 设置每天学习目标
+    _dailyReviewGoal = _progress.dailyReviewGoal; // 设置每天复习目标
 
     // 加载用户设置
     _settings = await Settings.load();
     _autoPlayPronunciation = _settings.autoPlayPronunciation;
     _showExampleByDefault = _settings.showExampleByDefault;
     _pronunciationType = _settings.pronunciationType;
+    _studyGroupSize = _settings.studyGroupSize;
+    _reviewGroupSize = _settings.reviewGroupSize;
+    _sortOption = _settings.sortOption;
 
     setState(() {
       _isLoading = false; // 加载完成，隐藏加载指示器
@@ -97,18 +119,99 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  /// 更新每天复习目标
+  ///
+  /// 参数：
+  /// - value: 新的每天复习目标单词数
+  void _updateDailyReviewGoal(double value) {
+    setState(() {
+      _dailyReviewGoal = value.toInt(); // 更新目标值
+    });
+  }
+
   /// 保存设置
   ///
   /// 将当前设置保存到本地存储
   void _saveSettings() {
-    _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日目标
+    _progress.dailyGoal = _dailyGoal; // 更新学习进度中的每日学习目标
+    _progress.dailyReviewGoal = _dailyReviewGoal; // 更新学习进度中的每日复习目标
     _progress.save(); // 保存学习进度
 
+    // 更新分组策略设置
+    _settings.studyGroupSize = _studyGroupSize;
+    _settings.reviewGroupSize = _reviewGroupSize;
     _settings.save(); // 保存用户设置
+
+    // 通知主页更新数据
+    if (widget.onSettingsSaved != null) {
+      widget.onSettingsSaved!();
+    }
 
     // 显示保存成功提示
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('设置已保存'), duration: Duration(seconds: 2)),
+    );
+  }
+
+  /// 重置为默认单词
+  ///
+  /// 将当前单词数据重置为50个默认单词
+  void _resetToDefaultWords() async {
+    // 显示确认对话框
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text('确认重置'),
+          content: Text('确定要将所有单词数据重置为50个默认单词吗？此操作不可撤销！'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('取消'),
+              onPressed: () {
+                Navigator.of(dialogContext).pop(); // 关闭对话框
+              },
+            ),
+            TextButton(
+              child: Text('重置'),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red, // 重置按钮文字颜色
+              ),
+              onPressed: () async {
+                Navigator.of(dialogContext).pop(); // 关闭对话框
+
+                try {
+                  // 保存当前上下文用于异步操作
+                  final scaffoldContext = ScaffoldMessenger.of(context).context;
+
+                  // 调用WordStorage的重置方法
+                  await WordStorage.resetToDefaultWords();
+
+                  // 显示重置成功提示
+                  ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                    SnackBar(
+                      content: Text('已成功重置为50个默认单词'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                } catch (e) {
+                  // 保存当前上下文用于异步操作
+                  final scaffoldContext = ScaffoldMessenger.of(context).context;
+
+                  // 显示重置失败提示
+                  ScaffoldMessenger.of(scaffoldContext).showSnackBar(
+                    SnackBar(
+                      content: Text('重置失败：$e'),
+                      duration: Duration(seconds: 2),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -156,6 +259,17 @@ class _SettingsPageState extends State<SettingsPage> {
     setState(() {
       _pronunciationType = type;
       _settings.pronunciationType = type;
+    });
+  }
+
+  /// 切换排序选项
+  ///
+  /// 参数：
+  /// - option: 要切换到的排序选项
+  void _toggleSortOption(SortOption option) {
+    setState(() {
+      _sortOption = option;
+      _settings.sortOption = option;
     });
   }
 
@@ -214,6 +328,44 @@ class _SettingsPageState extends State<SettingsPage> {
                   activeColor: Colors.blue, // 已选择部分颜色
                   inactiveColor: Colors.grey.shade300, // 未选择部分颜色
                   thumbColor: Colors.blue, // 滑块颜色
+                ),
+              ),
+              SizedBox(height: 10),
+              // 每天复习单词数设置
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 5,
+                ),
+                title: Text(
+                  '每天复习单词数',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                subtitle: Text(
+                  '$_dailyReviewGoal个单词/天', // 显示当前目标值
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Theme.of(context).textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ),
+              // 滑动条，用于调整每天复习单词数
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 20),
+                child: Slider(
+                  value: _dailyReviewGoal.toDouble(), // 当前值
+                  min: 5, // 最小值
+                  max: 200, // 最大值
+                  divisions: 39, // 刻度数
+                  label: '$_dailyReviewGoal', // 滑动时显示的标签
+                  onChanged: _updateDailyReviewGoal, // 滑动时的回调函数
+                  activeColor: Colors.green, // 已选择部分颜色
+                  inactiveColor: Colors.grey.shade300, // 未选择部分颜色
+                  thumbColor: Colors.green, // 滑块颜色
                 ),
               ),
             ]),
@@ -361,7 +513,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   child: DropdownButton<PronunciationType>(
                     value: _pronunciationType, // 当前选中的发音类型
-                    onChanged: (type) => _togglePronunciationType(type!), // 选择变化时的回调
+                    onChanged: (type) =>
+                        _togglePronunciationType(type!), // 选择变化时的回调
                     items: PronunciationType.values.map((type) {
                       // 发音类型选项
                       return DropdownMenuItem(
@@ -406,6 +559,189 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                 ),
               ),
+
+              SizedBox(height: 10),
+
+              // 排序选项选择
+              ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
+                title: Text(
+                  '单词排序方式',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).textTheme.bodyLarge?.color,
+                  ),
+                ),
+                trailing: Container(
+                  // 下拉选择框容器
+                  padding: EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: DropdownButton<SortOption>(
+                    value: _sortOption, // 当前选中的排序选项
+                    onChanged: (option) =>
+                        _toggleSortOption(option!), // 选择变化时的回调
+                    items: SortOption.values.map((option) {
+                      // 排序选项
+                      return DropdownMenuItem(
+                        value: option,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 15,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                          child: Text(
+                            _getSortOptionText(option), // 显示排序选项文本
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyMedium?.color, // 字体颜色
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    underline: SizedBox(), // 移除下拉框下划线
+                    icon: Icon(
+                      // 下拉箭头
+                      Icons.arrow_drop_down,
+                      color: Colors.blue.shade700,
+                    ),
+                    dropdownColor: // 下拉菜单背景色
+                    Theme.of(context).brightness == Brightness.dark
+                        ? Colors.grey.shade800
+                        : Colors.white,
+                    menuMaxHeight: 200, // 下拉菜单最大高度
+                    style: TextStyle(
+                      // 下拉菜单项样式
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                    borderRadius: BorderRadius.circular(15), // 下拉菜单圆角
+                  ),
+                ),
+              ),
+
+              SizedBox(height: 10),
+
+              // 分组策略设置
+              _buildSettingSection('分组策略', [
+                // 学习分组大小设置
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  title: Text(
+                    '学习分组大小',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$_studyGroupSize个单词/组', // 显示当前学习分组大小
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  ),
+                ),
+                // 数字输入框，用于调整学习分组大小
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: TextEditingController(text: '$_studyGroupSize'),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      int? size = int.tryParse(value);
+                      if (size != null && size >= 1 && size <= 50) {
+                        setState(() {
+                          _studyGroupSize = size;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: '每组单词数',
+                      hintText: '1-50',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 20),
+                // 复习分组大小设置
+                ListTile(
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  title: Text(
+                    '复习分组大小',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).textTheme.bodyLarge?.color,
+                    ),
+                  ),
+                  subtitle: Text(
+                    '$_reviewGroupSize个单词/组', // 显示当前复习分组大小
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  ),
+                ),
+                // 数字输入框，用于调整复习分组大小
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  child: TextField(
+                    controller: TextEditingController(
+                      text: '$_reviewGroupSize',
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) {
+                      int? size = int.tryParse(value);
+                      if (size != null && size >= 1 && size <= 50) {
+                        setState(() {
+                          _reviewGroupSize = size;
+                        });
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: '每组单词数',
+                      hintText: '1-50',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 15,
+                      ),
+                    ),
+                  ),
+                ),
+                // 添加垂直间距，确保输入框与组件底部之间有足够的留白空间
+                SizedBox(height: 20),
+              ]),
             ]),
 
             SizedBox(height: 25), // 垂直间距
@@ -562,6 +898,43 @@ class _SettingsPageState extends State<SettingsPage> {
             ]),
 
             SizedBox(height: 40), // 垂直间距
+            // 重置为默认单词按钮
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: 300), // 按钮最大宽度
+              child: GestureDetector(
+                onTap: _resetToDefaultWords, // 点击重置为默认单词
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 300), // 动画持续时间
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(vertical: 20), // 按钮内边距
+                  decoration: BoxDecoration(
+                    color: Colors.red, // 按钮背景色
+                    borderRadius: BorderRadius.circular(30), // 按钮圆角
+                    boxShadow: [
+                      // 按钮阴影
+                      BoxShadow(
+                        color: Color.fromRGBO(255, 0, 0, 0.3),
+                        spreadRadius: 5,
+                        blurRadius: 15,
+                        offset: Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '重置为50个默认单词',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            SizedBox(height: 20), // 垂直间距
             // 保存设置按钮
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: 300), // 按钮最大宽度
@@ -722,6 +1095,26 @@ class _SettingsPageState extends State<SettingsPage> {
         return '美式发音';
       case PronunciationType.british:
         return '英式发音';
+    }
+  }
+
+  ///
+  /// 获取排序选项的中文描述
+  ///
+  /// 参数：
+  /// - option: 排序选项枚举值
+  ///
+  /// 返回：排序选项的中文描述
+  String _getSortOptionText(SortOption option) {
+    switch (option) {
+      case SortOption.word:
+        return '按单词排序';
+      case SortOption.lastStudyTime:
+        return '按学习时间';
+      case SortOption.memoryStrength:
+        return '按记忆强度';
+      case SortOption.shuffle:
+        return '乱序学习';
     }
   }
 

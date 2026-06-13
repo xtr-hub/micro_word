@@ -25,4 +25,7 @@ test_coverage/
 # 其他
 .env
 *.log
+*_logs.txt
+*log*.txt
+diff.txt
 *.local

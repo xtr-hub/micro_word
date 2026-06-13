@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_tts/flutter_tts.dart'; // 引入Flutter TTS（文本转语音）库
 import '../models/settings.dart'; // 导入设置模型，使用PronunciationType枚举
 
@@ -77,7 +78,7 @@ class AudioService {
 
     // 播放错误时的回调
     _flutterTts.setErrorHandler((message) {
-      print('TTS错误: $message'); // 打印错误信息
+      debugPrint('TTS错误: $message'); // 打印错误信息
       _isSpeaking = false; // 更新说话状态为未播放
     });
   }

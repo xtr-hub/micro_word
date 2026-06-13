@@ -10,17 +10,47 @@ import 'package:provider/provider.dart';
 /// 主题提供者，用于管理应用的主题切换
 import 'providers/theme_provider.dart';
 
+/// 学习进度提供者，用于管理应用的学习进度状态
+import 'providers/study_progress_provider.dart';
+
 /// 主页面组件，包含底部导航栏和多个子页面
 import 'pages/home_page.dart';
 
 /// 启动页组件，应用启动时显示的第一个页面
 import 'pages/splash_page.dart';
 
+/// 学习页面组件
+import 'pages/study_page.dart';
+
+/// 复习页面组件
+import 'pages/review_page.dart';
+
+/// 自测页面组件
+import 'pages/quiz_page.dart';
+
+/// 自测设置页面组件
+import 'pages/quiz_settings_page.dart';
+
+/// 单词本页面组件
+import 'pages/word_book_page.dart';
+
+/// 设置页面组件
+import 'pages/settings_page.dart';
+
+/// 学习进度模型
+import 'models/study_progress.dart';
+
+/// 进度持久化服务
+import 'services/progress_persistence_service.dart';
+
+/// 数据一致性服务
+import 'services/data_consistency_service.dart';
+
 /// 应用程序的入口点
 ///
 /// Flutter应用总是从main函数开始执行
 /// 该函数负责初始化应用环境并启动应用
-void main() {
+void main() async {
   /// 确保Flutter框架初始化完成
   ///
   /// 这是调用平台通道前的必要步骤，确保Flutter引擎已完全初始化
@@ -40,20 +70,42 @@ void main() {
   /// 提供更沉浸式的用户体验，适合学习类应用
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
 
+  /// 初始化进度持久化服务
+  ///
+  /// 该服务负责自动保存学习进度和单词数据
+  ProgressPersistenceService.instance.initialize();
+
+  /// 验证和修复数据一致性
+  ///
+  /// 在应用启动时检查数据完整性并修复发现的问题
+  await DataConsistencyService.instance.validateAndRepairData();
+
+  /// 记录应用启动时间
+  ///
+  /// 加载学习进度并更新应用关闭时间
+  final progress = await StudyProgress.load();
+  progress.recordAppCloseTime(DateTime.now());
+
   /// 运行Flutter应用
   ///
   /// runApp函数是Flutter应用的启动点，它将根组件渲染到屏幕上
   runApp(
-    /// 使用ChangeNotifierProvider包装根组件
+    /// 使用MultiProvider包装根组件
     ///
-    /// Provider是Flutter中常用的状态管理库
-    /// ChangeNotifierProvider用于在组件树中共享可变化的状态
-    ChangeNotifierProvider(
-      /// 创建ThemeProvider实例
-      ///
-      /// create参数接收一个函数，该函数返回要共享的状态对象
-      /// 这里创建了一个ThemeProvider实例，用于管理应用主题
-      create: (_) => ThemeProvider(),
+    /// MultiProvider用于在组件树中同时共享多个可变化的状态
+    MultiProvider(
+      /// 提供多个状态管理器
+      providers: [
+        /// 创建ThemeProvider实例
+        ///
+        /// 用于管理应用主题
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+
+        /// 创建StudyProgressProvider实例
+        ///
+        /// 用于管理应用的学习进度状态
+        ChangeNotifierProvider(create: (_) => StudyProgressProvider()),
+      ],
 
       /// 根组件为WordApp
       ///
@@ -171,8 +223,13 @@ class WordApp extends StatelessWidget {
       /// 路由表用于管理页面导航，通过路由名称可以跳转到对应的页面
       /// 键是路由名称，值是一个函数，返回对应的页面组件
       routes: {
-        '/home': (context) =>
-            HomePage(), // 主页面路由，通过Navigator.pushNamed(context, '/home')可以跳转到主页面
+        '/home': (context) => HomePage(), // 主页面路由
+        '/study': (context) => StudyPage(), // 学习页面路由
+        '/review': (context) => ReviewPage(), // 复习页面路由
+        '/quiz': (context) => QuizPage(), // 自测页面路由
+        '/quiz_settings': (context) => QuizSettingsPage(), // 自测设置页面路由
+        '/wordbook': (context) => WordBookPage(), // 单词本页面路由
+        '/settings': (context) => SettingsPage(), // 设置页面路由
       },
     );
   }

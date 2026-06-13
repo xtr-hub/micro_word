@@ -1,34 +1,65 @@
 import 'dart:async'; // 计时器相关库
+import 'dart:io'; // 文件操作库
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
-import '../models/word_storage.dart'; // 单词存储服务
+import '../services/word_storage.dart'; // 单词存储服务
+import '../models/word_list.dart'; // 单词表数据模型
+import '../services/word_list_storage.dart'; // 单词表存储服务
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
+import '../models/quiz_record.dart'; // 测试记录模型
+import '../models/quiz_settings.dart'; // 测试设置模型
 import '../services/audio_service.dart'; // 音频播放服务
+import './quiz_result_page.dart'; // 测试结果页面
+import './quiz_history_page.dart'; // 测试历史页面
 
 /// 测试页面
 ///
 /// 功能：
 /// - 支持两种测试模式：选择题和填空题
-/// - 随机生成10个单词进行测试
+/// - 随机生成指定数量的单词进行测试
 /// - 支持播放单词发音
 /// - 实时统计测试结果
 /// - 测试完成后显示详细结果
 /// - 测试完成后显示详细结果
 /// - 根据测试结果更新单词学习状态
-class TestPage extends StatefulWidget {
+class QuizPage extends StatefulWidget {
+  /// 测试单词数量
+  final int testWordCount;
+
+  /// 选中的单词表
+  final WordList? selectedWordList;
+
+  /// 自定义单词表文件路径
+  final String? customWordListPath;
+
+  /// 构造函数
+  const QuizPage({
+    Key? key,
+    this.testWordCount = 10,
+    this.selectedWordList,
+    this.customWordListPath,
+  }) : super(key: key);
+
   /// 创建页面状态对象
   @override
-  _TestPageState createState() => _TestPageState();
+  _QuizPageState createState() => _QuizPageState();
 }
 
-/// TestPage 的状态管理类
-class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
+/// QuizPage 的状态管理类
+class _QuizPageState extends State<QuizPage> with WidgetsBindingObserver {
   /// 当前测试模式
-  TestMode _testMode = TestMode.multipleChoice;
+  QuizMode _testMode = QuizMode.multipleChoice;
 
   /// 所有单词列表
   late List<Word> _words;
+
+  /// 当前单词表
+  late WordList _currentWordList;
+
+  /// 过滤后的单词列表（当前单词表中的单词）
+  late List<Word> _filteredWords;
 
   /// 当前测试的单词列表（随机选择10个）
   late List<Word> _testWords;
@@ -39,6 +70,12 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 用户选择的答案
   //String? _selectedAnswer;
   ValueNotifier<String?> _selectedAnswer = ValueNotifier<String?>(null);
+
+  /// 存储每个测试题的用户答案
+  Map<int, String?> _userAnswers = {};
+
+  /// 填空题输入框控制器
+  late TextEditingController _blankFillController;
 
   /// 测试结果统计
   int _correctCount = 0; // 正确数量
@@ -56,6 +93,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 用户设置对象
   late Settings _settings;
 
+  /// 测试设置对象
+  late QuizSettings _testSettings;
+
   /// 学习时长计时器
   Timer? _studyTimer;
 
@@ -71,6 +111,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     super.initState();
     // 注册应用生命周期观察者
     WidgetsBinding.instance.addObserver(this);
+    // 初始化填空题输入框控制器
+    _blankFillController = TextEditingController();
     // 加载单词数据和学习进度
     _loadData();
   }
@@ -153,7 +195,31 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _stopStudyTimer();
     // 移除应用生命周期观察者
     WidgetsBinding.instance.removeObserver(this);
+    // 释放填空题输入框控制器
+    _blankFillController.dispose();
     super.dispose();
+  }
+
+  /// 当widget的参数发生变化时调用
+  @override
+  void didUpdateWidget(QuizPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    debugPrint('QuizPage: didUpdateWidget被调用');
+    debugPrint(
+      'QuizPage: 旧参数 - testWordCount: ${oldWidget.testWordCount}, selectedWordList: ${oldWidget.selectedWordList}, customWordListPath: ${oldWidget.customWordListPath}',
+    );
+    debugPrint(
+      'QuizPage: 新参数 - testWordCount: ${widget.testWordCount}, selectedWordList: ${widget.selectedWordList}, customWordListPath: ${widget.customWordListPath}',
+    );
+
+    // 检查widget的参数是否发生变化
+    if (oldWidget.testWordCount != widget.testWordCount ||
+        oldWidget.selectedWordList != widget.selectedWordList ||
+        oldWidget.customWordListPath != widget.customWordListPath) {
+      debugPrint('QuizPage: 参数发生变化，重新加载数据');
+      // 参数发生变化，重新加载数据
+      _loadData();
+    }
   }
 
   /// 加载单词数据和学习进度
@@ -164,12 +230,98 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       _isLoading = true; // 开始加载，显示加载指示器
     });
 
-    // 从本地存储加载单词列表
-    _words = await WordStorage.loadWords();
-    // 从本地存储加载学习进度
-    _progress = await StudyProgress.load();
-    // 从本地存储加载用户设置
-    _settings = await Settings.load();
+    // 并行加载数据
+    final wordsFuture = WordStorage.loadWords();
+    final progressFuture = StudyProgress.load();
+    final settingsFuture = Settings.load();
+    final currentWordListFuture = WordListStorage.getCurrentWordList();
+    final wordListsFuture = WordListStorage.loadWordLists();
+
+    // 加载测试设置
+    final testSettingsFuture = QuizSettingsStorage.loadQuizSettings();
+
+    final results = await Future.wait([
+      wordsFuture,
+      progressFuture,
+      settingsFuture,
+      currentWordListFuture,
+      wordListsFuture,
+      testSettingsFuture,
+    ]);
+
+    _words = results[0] as List<Word>;
+    _progress = results[1] as StudyProgress;
+    _settings = results[2] as Settings;
+    _currentWordList = results[3] as WordList;
+    final wordLists = results[4] as List<WordList>;
+    _testSettings = results[5] as QuizSettings;
+
+    // 如果当前单词表的wordIds列表为空，将所有单词的ID添加到当前单词表中
+    if (_currentWordList.wordIds.isEmpty && _words.isNotEmpty) {
+      // 更新当前单词表的wordIds列表
+      _currentWordList.wordIds = _words.map((word) => word.id).toList();
+
+      // 同时更新wordLists列表中的对应单词表
+      final index = wordLists.indexWhere((wl) => wl.id == _currentWordList.id);
+      if (index != -1) {
+        wordLists[index] = _currentWordList;
+      }
+
+      // 保存更新后的单词表
+      await WordListStorage.saveWordLists(wordLists);
+    }
+
+    // 根据传入的参数或保存的测试设置加载相应的单词
+    if (widget.customWordListPath != null) {
+      // 从自定义单词表文件加载单词
+      try {
+        final file = File(widget.customWordListPath!);
+        final content = await file.readAsString();
+        final customWords = WordStorage.parseWordsFromJson(content);
+        _filteredWords = customWords;
+      } catch (e) {
+        debugPrint('加载自定义单词表失败: $e');
+        // 如果加载失败，使用默认单词表
+        _filteredWords = _words
+            .where((word) => _currentWordList.wordIds.contains(word.id))
+            .toList();
+      }
+    } else if (widget.selectedWordList != null) {
+      // 从选中的单词表加载单词
+      _filteredWords = _words
+          .where((word) => widget.selectedWordList!.wordIds.contains(word.id))
+          .toList();
+    } else if (_testSettings.customWordListPath != null) {
+      // 从保存的自定义单词表路径加载单词
+      try {
+        final file = File(_testSettings.customWordListPath!);
+        final content = await file.readAsString();
+        final customWords = WordStorage.parseWordsFromJson(content);
+        _filteredWords = customWords;
+      } catch (e) {
+        debugPrint('加载保存的自定义单词表失败: $e');
+        // 如果加载失败，使用默认单词表
+        _filteredWords = _words
+            .where((word) => _currentWordList.wordIds.contains(word.id))
+            .toList();
+      }
+    } else if (_testSettings.selectedWordListId != null &&
+        wordLists.isNotEmpty) {
+      // 从保存的选中单词表加载单词
+      final selectedWordList = wordLists.firstWhere(
+        (list) => list.id == _testSettings.selectedWordListId,
+        orElse: () => _currentWordList,
+      );
+      _filteredWords = _words
+          .where((word) => selectedWordList.wordIds.contains(word.id))
+          .toList();
+    } else {
+      // 从当前单词表加载单词
+      _filteredWords = _words
+          .where((word) => _currentWordList.wordIds.contains(word.id))
+          .toList();
+    }
+
     // 生成测试单词列表
     _generateTestWords();
 
@@ -185,14 +337,17 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
 
   /// 生成测试单词列表
   ///
-  /// 从所有单词中随机选择10个作为测试单词
+  /// 从当前单词表中随机选择指定数量的单词作为测试单词
   void _generateTestWords() {
     _testWords = [];
-    // 创建单词列表的副本，避免修改原始列表
-    final availableWords = List.from(_words);
+    // 创建过滤后的单词列表的副本，避免修改原始列表
+    final availableWords = List.from(_filteredWords);
 
-    // 随机选择10个单词，直到选满或没有更多单词
-    while (_testWords.length < 10 && availableWords.isNotEmpty) {
+    // 确定测试单词数量：优先使用传入的参数
+    final testCount = widget.testWordCount;
+
+    // 随机选择指定数量的单词，直到选满或没有更多单词
+    while (_testWords.length < testCount && availableWords.isNotEmpty) {
       // 使用当前时间的毫秒数作为随机数种子，选择一个随机索引
       final randomIndex =
           DateTime.now().millisecondsSinceEpoch % availableWords.length;
@@ -213,6 +368,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       _wrongCount = 0; // 重置错误计数
       _showResult = false; // 隐藏测试结果
       _selectedAnswer.value = null; // 清空选中答案
+      _userAnswers = {}; // 清空用户答案映射
       _generateTestWords(); // 生成新的测试单词列表
     });
   }
@@ -229,7 +385,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 提交答案
   ///
   /// 检查用户答案是否正确，更新测试结果，并移动到下一个测试题
-  void _submitAnswer() {
+  void _submitAnswer() async {
     // 如果没有选择答案，直接返回
     if (_selectedAnswer.value == null) return;
 
@@ -238,15 +394,18 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     bool isCorrect = false;
 
     // 根据测试模式检查答案是否正确
-    if (_testMode == TestMode.multipleChoice) {
+    if (_testMode == QuizMode.multipleChoice) {
       // 选择题：检查选择的释义是否正确
       isCorrect = _selectedAnswer.value == currentWord.meaning;
-    } else if (_testMode == TestMode.blankFill) {
+    } else if (_testMode == QuizMode.blankFill) {
       // 填空题：检查输入的单词是否正确（忽略大小写和前后空格）
       isCorrect =
           _selectedAnswer.value?.trim().toLowerCase() ==
           currentWord.word.toLowerCase();
     }
+
+    // 存储当前测试题的用户答案
+    _userAnswers[_currentIndex] = _selectedAnswer.value;
 
     setState(() {
       if (isCorrect) {
@@ -266,9 +425,13 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         // 移动到下一个测试题
         _currentIndex++;
         _selectedAnswer.value = null; // 清空选中答案
+        // 如果是填空题，清空输入框内容
+        if (_testMode == QuizMode.blankFill) {
+          _blankFillController.clear();
+        }
       } else {
-        // 测试完成，显示结果
-        _showResult = true;
+        // 测试完成，生成测试记录
+        _generateQuizRecord();
       }
     });
 
@@ -285,6 +448,80 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _progress.updateWordsStudied(1, isMastered);
   }
 
+  /// 生成测试记录
+  void _generateQuizRecord() async {
+    // 停止学习时长计时器并计算测试时长
+    _stopStudyTimer();
+    final testDuration = _sessionStudyTime;
+
+    // 计算测试总题数和得分
+    final total = _correctCount + _wrongCount;
+    final score = total > 0 ? (_correctCount / total * 100).toInt() : 0;
+
+    // 生成题目记录
+    final questions = <QuizQuestion>[];
+    for (int i = 0; i < _testWords.length; i++) {
+      final word = _testWords[i];
+      final userAnswer = _userAnswers[i]; // 从映射中获取用户答案
+      QuizQuestion question;
+      if (_testMode == QuizMode.multipleChoice) {
+        // 选择题
+        final options = _generateOptions(word.meaning);
+        bool isCorrect = userAnswer == word.meaning;
+        question = QuizQuestion(
+          id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
+          mode: QuizMode.multipleChoice,
+          question: word.word,
+          userAnswer: userAnswer,
+          correctAnswer: word.meaning,
+          status: userAnswer != null
+              ? (isCorrect ? QuestionStatus.correct : QuestionStatus.wrong)
+              : QuestionStatus.unattempted,
+          options: options,
+        );
+      } else {
+        // 填空题
+        bool isCorrect =
+            userAnswer?.trim().toLowerCase() == word.word.toLowerCase();
+        question = QuizQuestion(
+          id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
+          mode: QuizMode.blankFill,
+          question: word.meaning,
+          userAnswer: userAnswer,
+          correctAnswer: word.word,
+          status: userAnswer != null
+              ? (isCorrect ? QuestionStatus.correct : QuestionStatus.wrong)
+              : QuestionStatus.unattempted,
+        );
+      }
+      questions.add(question);
+    }
+
+    // 生成测试记录
+    final testRecord = QuizRecord(
+      testTime: DateTime.now(),
+      testDuration: testDuration,
+      totalQuestions: total,
+      correctQuestions: _correctCount,
+      score: score,
+      testMode: _testMode,
+      testWordCount: _testWords.length,
+      testRange: '随机测试',
+      questions: questions,
+    );
+
+    // 保存测试记录
+    await QuizRecordStorage.addRecord(testRecord);
+
+    // 跳转到测试结果页面
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => QuizResultPage(testRecord: testRecord),
+      ),
+    );
+  }
+
   /// 生成选择题选项
   ///
   /// 为选择题生成4个选项，包含1个正确答案和3个错误答案
@@ -294,7 +531,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// 返回：包含4个选项的列表，已打乱顺序
   List<String> _generateOptions(String correctAnswer) {
     final options = [correctAnswer]; // 先添加正确答案
-    final availableWords = List.from(_words); // 创建单词列表副本
+    final availableWords = List.from(_filteredWords); // 从当前单词表中选择选项
 
     // 随机选择3个错误选项
     while (options.length < 4 && availableWords.isNotEmpty) {
@@ -306,6 +543,20 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       // 确保错误选项不与正确答案重复，且不重复添加
       if (word.meaning != correctAnswer && !options.contains(word.meaning)) {
         options.add(word.meaning);
+      }
+    }
+
+    // 如果当前单词表中的单词不够，从所有单词中补充
+    if (options.length < 4) {
+      final allAvailableWords = List.from(_words);
+      while (options.length < 4 && allAvailableWords.isNotEmpty) {
+        final randomIndex =
+            DateTime.now().millisecondsSinceEpoch % allAvailableWords.length;
+        final word = allAvailableWords.removeAt(randomIndex);
+
+        if (word.meaning != correctAnswer && !options.contains(word.meaning)) {
+          options.add(word.meaning);
+        }
       }
     }
 
@@ -336,6 +587,33 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       );
     }
 
+    // 当前单词表中没有单词时显示提示
+    if (_filteredWords.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              '当前单词表中没有单词',
+              style: TextStyle(
+                fontSize: 22,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 20),
+            Text(
+              '请先添加单词到 "${_currentWordList.name}"',
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).textTheme.bodyLarge?.color,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // 构建测试页面UI
     return Padding(
       padding: const EdgeInsets.all(20.0), // 页面内边距
@@ -353,9 +631,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
                 alignment: WrapAlignment.center, // 居中对齐
                 children: [
                   // 选择题按钮
-                  _testModeButton('选择题', TestMode.multipleChoice),
+                  _testModeButton('选择题', QuizMode.multipleChoice),
                   // 填空题按钮
-                  _testModeButton('填空题', TestMode.blankFill),
+                  _testModeButton('填空题', QuizMode.blankFill),
                 ],
               ),
             ),
@@ -375,7 +653,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// - mode: 按钮对应的测试模式
   ///
   /// 返回：构建好的测试模式按钮Widget
-  Widget _testModeButton(String text, TestMode mode) {
+  Widget _testModeButton(String text, QuizMode mode) {
     // 判断当前按钮是否被选中
     final isSelected = _testMode == mode;
     // 判断当前是否为深色模式
@@ -504,7 +782,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
                   // 根据测试模式显示不同内容
                   // 选择题：显示单词
                   // 填空题：显示释义
-                  _testMode == TestMode.multipleChoice
+                  _testMode == QuizMode.multipleChoice
                       ? currentWord.word
                       : currentWord.meaning,
                   style: TextStyle(
@@ -518,8 +796,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
               ),
               SizedBox(width: 15), // 单词与发音按钮间距
               // 音频播放按钮
-              if (_testMode == TestMode.multipleChoice ||
-                  _testMode == TestMode.blankFill) // 两种模式都显示播放按钮
+              if (_testMode == QuizMode.multipleChoice ||
+                  _testMode == QuizMode.blankFill) // 两种模式都显示播放按钮
                 _AnimatedPlayButton(
                   onPressed: () => _speakWord(currentWord.word),
                   size: 36,
@@ -529,7 +807,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         ),
 
         // 根据测试模式显示不同的测试内容
-        if (_testMode == TestMode.multipleChoice)
+        if (_testMode == QuizMode.multipleChoice)
           // 选择题：显示选项
           _buildMultipleChoiceOptions(currentWord)
         else
@@ -598,69 +876,90 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     // 构建选项列表
     return Column(
       mainAxisSize: MainAxisSize.min,
-      children: options.map((option) {
-        return ValueListenableBuilder<String?>(
-          valueListenable: _selectedAnswer,
-          builder: (context, selectedAnswer, child) {
-            // 判断当前选项是否被选中
-            final isSelected = selectedAnswer == option;
-            return GestureDetector(
-              onTap: () => _handleAnswerSelect(option), // 点击选择该选项
-              child: AnimatedContainer(
-                duration: Duration(milliseconds: 200), // 动画持续时间
-                margin: EdgeInsets.symmetric(
-                  vertical: 8,
-                  horizontal: 20,
-                ), // 选项间距
-                padding: EdgeInsets.symmetric(
-                  horizontal: 25,
-                  vertical: 18,
-                ), // 选项内边距
-                decoration: BoxDecoration(
-                  // 选项背景色：选中时显示蓝色，否则根据主题模式调整
-                  color: isSelected
-                      ? Colors.blue
-                      : (Theme.of(context).brightness == Brightness.dark
-                            ? Colors.grey.shade800
-                            : Colors.white),
-                  borderRadius: BorderRadius.circular(25), // 选项圆角
-                  boxShadow: [
-                    // 选项阴影
-                    BoxShadow(
-                      color: isSelected
-                          ? Color.fromRGBO(0, 122, 255, 0.3)
-                          : Color.fromRGBO(128, 128, 128, 0.2),
-                      spreadRadius: isSelected ? 4 : 3,
-                      blurRadius: isSelected ? 12 : 8,
-                      offset: Offset(0, isSelected ? 8 : 5),
-                    ),
-                  ],
-                  border: Border.all(
-                    // 选项边框：选中时显示蓝色边框
-                    color: isSelected
-                        ? Colors.blue.shade400
-                        : Colors.transparent,
-                    width: isSelected ? 3 : 0,
+      children: [
+        // 提示文字
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: EdgeInsets.only(left: 20, bottom: 15),
+            child: Text(
+              '请选择正确的释义',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+            ),
+          ),
+        ),
+        // 选项列表
+        for (int i = 0; i < options.length; i++)
+          _buildMeaningOption(i, options[i], word.meaning),
+      ],
+    );
+  }
+
+  /// 构建释义选项
+  Widget _buildMeaningOption(int index, String meaning, String correctMeaning) {
+    return ValueListenableBuilder<String?>(
+      valueListenable: _selectedAnswer,
+      builder: (context, selectedAnswer, child) {
+        final isSelected = selectedAnswer == meaning;
+        final isCorrect = meaning == correctMeaning;
+
+        Color bgColor = Colors.white;
+        Color textColor = Colors.black;
+        Color borderColor = Colors.grey.shade200;
+
+        if (isSelected) {
+          bgColor = Colors.blue.shade50;
+          borderColor = Colors.blue;
+        }
+
+        return GestureDetector(
+          onTap: () => _handleAnswerSelect(meaning),
+          child: Container(
+            margin: EdgeInsets.only(bottom: 15),
+            padding: EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: borderColor, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 3,
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                // 选项标记
+                Container(
+                  width: 24,
+                  height: 24,
+                  margin: EdgeInsets.only(right: 15),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? Colors.blue : Colors.grey.shade300,
+                  ),
+                  child: isSelected
+                      ? Icon(Icons.check, size: 16, color: Colors.white)
+                      : SizedBox(),
+                ),
+
+                // 选项文本
+                Expanded(
+                  child: Text(
+                    meaning,
+                    style: TextStyle(fontSize: 18, color: textColor),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                child: Text(
-                  option, // 选项文本
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 20, // 文本字体大小
-                    fontWeight: isSelected
-                        ? FontWeight.bold
-                        : FontWeight.normal, // 选中时加粗
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.blue.shade700, // 文本颜色
-                  ),
-                ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
-      }).toList(),
+      },
     );
   }
 
@@ -675,6 +974,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
       child: Container(
         margin: EdgeInsets.symmetric(horizontal: 40), // 输入框外边距
         child: TextField(
+          controller: _blankFillController, // 使用输入框控制器
           onChanged: (value) => _handleAnswerSelect(value), // 输入变化时更新选中答案
           decoration: InputDecoration(
             hintText: '请输入对应的英文单词', // 提示文本
@@ -978,12 +1278,4 @@ class __AnimatedPlayButtonState extends State<_AnimatedPlayButton> {
       ),
     );
   }
-}
-
-/// 测试模式枚举
-///
-/// 定义了两种测试模式：
-enum TestMode {
-  multipleChoice, // 选择题模式
-  blankFill, // 填空题模式
 }
