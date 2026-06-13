@@ -6,19 +6,19 @@ import './word_list.dart';
 /// 测试设置类
 ///
 /// 用于存储和管理测试相关的设置
-class TestSettings {
+class QuizSettings {
   int testWordCount;
   int? selectedWordListId;
   String? customWordListPath;
 
-  TestSettings({
+  QuizSettings({
     this.testWordCount = 10,
     this.selectedWordListId,
     this.customWordListPath,
   });
 
-  factory TestSettings.fromJson(Map<String, dynamic> json) {
-    return TestSettings(
+  factory QuizSettings.fromJson(Map<String, dynamic> json) {
+    return QuizSettings(
       testWordCount: json['testWordCount'] ?? 10,
       selectedWordListId: json['selectedWordListId'],
       customWordListPath: json['customWordListPath'],
@@ -37,7 +37,7 @@ class TestSettings {
 /// 测试设置存储服务
 ///
 /// 用于处理测试设置的持久化存储和读取
-class TestSettingsStorage {
+class QuizSettingsStorage {
   static const String _testSettingsKey = 'test_settings';
 
   /// 保存测试设置
@@ -45,8 +45,8 @@ class TestSettingsStorage {
   /// 参数：
   /// - settings: 要保存的测试设置对象
   /// - wordList: 选中的单词表（可选）
-  static Future<bool> saveTestSettings(
-    TestSettings settings, [
+  static Future<bool> saveQuizSettings(
+    QuizSettings settings, [
     WordList? wordList,
   ]) async {
     try {
@@ -69,28 +69,28 @@ class TestSettingsStorage {
   /// 加载测试设置
   ///
   /// 返回：
-  /// - TestSettings: 加载的测试设置对象
-  static Future<TestSettings> loadTestSettings() async {
+  /// - QuizSettings: 加载的测试设置对象
+  static Future<QuizSettings> loadQuizSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final jsonString = prefs.getString(_testSettingsKey);
 
       if (jsonString != null) {
         final jsonData = json.decode(jsonString) as Map<String, dynamic>;
-        return TestSettings.fromJson(jsonData);
+        return QuizSettings.fromJson(jsonData);
       }
     } catch (e) {
       debugPrint('加载测试设置失败: $e');
     }
 
-    return TestSettings();
+    return QuizSettings();
   }
 
   /// 删除测试设置
   ///
   /// 返回：
   /// - bool: 删除是否成功
-  static Future<bool> deleteTestSettings() async {
+  static Future<bool> deleteQuizSettings() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_testSettingsKey);

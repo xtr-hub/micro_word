@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../models/word.dart';
-import '../models/word_storage.dart';
-import '../models/word_list_storage.dart';
+import '../services/word_storage.dart';
+import '../services/word_list_storage.dart';
 import '../models/word_list.dart';
 import '../models/study_progress.dart';
 import 'platform_storage.dart';

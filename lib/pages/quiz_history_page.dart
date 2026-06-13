@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/test_record.dart';
-import './test_result_page.dart';
+import '../models/quiz_record.dart';
+import './quiz_result_page.dart';
 
 /// 测试历史页面组件
 ///
@@ -8,17 +8,17 @@ import './test_result_page.dart';
 /// - 历史记录列表（按时间倒序排列）
 /// - 历史记录筛选功能
 /// - 点击查看历史测试结果详情
-class TestHistoryPage extends StatefulWidget {
+class QuizHistoryPage extends StatefulWidget {
   /// 创建测试历史页面状态对象
-  const TestHistoryPage({Key? key}) : super(key: key);
+  const QuizHistoryPage({Key? key}) : super(key: key);
 
   @override
-  _TestHistoryPageState createState() => _TestHistoryPageState();
+  _QuizHistoryPageState createState() => _QuizHistoryPageState();
 }
 
-class _TestHistoryPageState extends State<TestHistoryPage> {
+class _QuizHistoryPageState extends State<QuizHistoryPage> {
   /// 测试记录列表
-  late List<TestRecord> _testRecords;
+  late List<QuizRecord> _testRecords;
 
   /// 加载状态
   bool _isLoading = true;
@@ -30,17 +30,17 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
   @override
   void initState() {
     super.initState();
-    _loadTestRecords();
+    _loadQuizRecords();
   }
 
   /// 加载测试记录
-  Future<void> _loadTestRecords() async {
+  Future<void> _loadQuizRecords() async {
     setState(() {
       _isLoading = true;
     });
 
     // 从本地存储加载测试记录
-    _testRecords = await TestRecordStorage.loadRecords();
+    _testRecords = await QuizRecordStorage.loadRecords();
 
     setState(() {
       _isLoading = false;
@@ -48,8 +48,8 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
   }
 
   /// 筛选测试记录
-  List<TestRecord> _filterRecords() {
-    var filtered = List<TestRecord>.from(_testRecords);
+  List<QuizRecord> _filterRecords() {
+    var filtered = List<QuizRecord>.from(_testRecords);
 
     // 按日期范围筛选
     if (_selectedDateRange != null) {
@@ -73,7 +73,7 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
           // 刷新按钮
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _loadTestRecords,
+            onPressed: _loadQuizRecords,
             tooltip: '刷新记录',
           ),
 
@@ -106,7 +106,7 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
                         itemCount: filteredRecords.length,
                         itemBuilder: (context, index) {
                           final record = filteredRecords[index];
-                          return _buildTestRecordItem(record);
+                          return _buildQuizRecordItem(record);
                         },
                       );
               },
@@ -115,7 +115,7 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
   }
 
   /// 构建测试记录项
-  Widget _buildTestRecordItem(TestRecord record) {
+  Widget _buildQuizRecordItem(QuizRecord record) {
     // 计算测试日期
     final testDate = record.testTime;
     final now = DateTime.now();
@@ -146,7 +146,7 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => TestResultPage(testRecord: record),
+            builder: (context) => QuizResultPage(testRecord: record),
           ),
         );
       },
@@ -177,7 +177,7 @@ class _TestHistoryPageState extends State<TestHistoryPage> {
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                 ),
                 Text(
-                  record.testMode == TestMode.multipleChoice ? '选择题' : '填空题',
+                  record.testMode == QuizMode.multipleChoice ? '选择题' : '填空题',
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.blue.shade700,

@@ -3,7 +3,7 @@ import 'package:fl_chart/fl_chart.dart'; // 图表库，用于显示学习数据
 import 'package:provider/provider.dart'; // 状态管理库，用于主题切换
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
-import '../models/word_storage.dart'; // 单词存储服务
+import '../services/word_storage.dart'; // 单词存储服务
 import '../providers/theme_provider.dart'; // 主题状态管理
 
 /// 设置页面

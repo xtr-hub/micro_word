@@ -1,125 +1,54 @@
-# 微单词 - 英语单词学习应用
+# 微单词英语学习应用
 
-一个简洁、高效的英语单词学习应用，帮助用户轻松掌握英语单词。
+微单词是一款基于 Flutter 的跨平台英语单词学习应用，提供单词学习、复习测试、单词本管理、学习进度统计和本地数据持久化能力，适合日常背词、阶段复习和自定义词库管理。
 
-## 功能特点
+[![Flutter](https://img.shields.io/badge/Flutter-%E8%B7%A8%E5%B9%B3%E5%8F%B0-blue?style=flat-square)](https://flutter.dev/)
+[![Dart](https://img.shields.io/badge/Dart-3.x-blue?style=flat-square)](https://dart.dev/)
+[![Provider](https://img.shields.io/badge/State-Provider-green?style=flat-square)](https://pub.dev/packages/provider)
+[![SQLite](https://img.shields.io/badge/Storage-Sqflite-orange?style=flat-square)](https://pub.dev/packages/sqflite)
+[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-purple?style=flat-square)](#快速开始)
 
-### 核心学习功能
-- 单词学习：通过选择正确的释义来学习单词
-- 发音功能：点击发音按钮听单词发音
-- 例句展示：每个单词配有例句，帮助理解单词用法
-- 收藏功能：收藏重要单词，方便后续复习
-- 学习进度：显示当前学习进度
+## 核心功能
 
-### 单词表管理
-- 单词表功能：支持创建多个单词表，管理不同类型的单词
-- 多单词表切换：在不同单词表之间快速切换，专注当前学习内容
-- 单词表管理：创建、编辑、删除单词表，灵活组织单词
-- 定向学习：针对特定单词表进行学习和测试
-- 乱序学习：支持单词表乱序排列，增强记忆效果
-
-### 数据管理
-- 学习进度持久化：自动保存学习进度，跨会话保留
-- 数据一致性：内置数据验证和修复机制
-- 备份功能：自动创建数据备份，防止数据丢失
-
-### 测试与复习
-- 测试功能：对已学习的单词进行测试，检验学习效果
-- 复习功能：根据记忆曲线复习单词，巩固学习成果
-- 测试历史：查看历史测试记录，追踪学习进度
-- 测试设置：自定义测试参数，包括题目数量、时间限制等
-
-### 学习中心
-- 签到功能：每日签到记录学习习惯，激励持续学习
-- 学习记录：查看连续学习天数和签到历史
-- 学习统计：展示总学习单词数、已掌握单词数、学习时长等统计数据
-- 今日进度：实时显示今日学习和复习进度
-
-### 设置功能
-- 主题切换：支持深色/浅色主题
-- 音频设置：调整发音音量和语速
-- 数据管理：导入/导出单词数据，备份学习进度
-- 学习目标设置：自定义每日学习和复习目标
-- 重置功能：重置为默认单词，重新开始学习
+- **单词学习**：支持单词释义、音标、例句和掌握状态记录
+- **发音辅助**：集成文本转语音能力，帮助用户练习听读
+- **复习巩固**：根据学习状态筛选复习内容，强化记忆效果
+- **自我测验**：支持选择题、填空题等测验方式，查看测验结果和历史记录
+- **单词本管理**：支持单词增删改查、收藏、搜索、排序和多单词表管理
+- **学习中心**：展示签到、连续学习天数、今日进度、学习时长和掌握统计
+- **数据持久化**：使用本地数据库和跨平台存储保存单词、单词表、学习进度和设置
+- **主题设置**：支持浅色、深色和跟随系统主题
+- **跨平台运行**：支持 Android、iOS、Web、Windows、macOS 和 Linux
 
 ## 技术栈
 
-- Flutter：跨平台移动应用开发框架
-- Dart：编程语言
-- 状态管理：使用 Provider 进行全局状态管理
-- 本地存储：使用文件 I/O 和 JSON 序列化存储数据
-- 路由管理：使用 Navigator 进行页面导航
-- 跨平台兼容：支持 Web、iOS、Android、Windows、macOS 和 Linux 平台
+| 技术 | 用途 |
+| --- | --- |
+| Flutter | 跨平台应用框架 |
+| Dart | 开发语言 |
+| Provider | 全局状态管理 |
+| sqflite / sqflite_common_ffi | 本地数据库与桌面测试支持 |
+| shared_preferences | 轻量级本地设置存储 |
+| flutter_tts | 单词发音 |
+| fl_chart | 学习统计图表 |
+| file_picker | 数据导入导出文件选择 |
+| flutter_test / integration_test | Widget 测试和集成测试 |
 
-## 项目结构
+## 快速开始
 
-```
-lib/
-├── main.dart                    # 应用入口文件
-├── models/                      # 数据模型
-│   ├── word.dart                # 单词数据模型
-│   ├── word_storage.dart        # 单词存储服务
-│   ├── word_list.dart           # 单词表数据模型
-│   ├── word_list_storage.dart   # 单词表存储服务
-│   ├── study_progress.dart      # 学习进度模型
-│   ├── settings.dart            # 设置数据模型
-│   └── test_record.dart         # 测试记录模型
-├── pages/                       # 页面组件
-│   ├── splash_page.dart         # 启动页面
-│   ├── home_page.dart           # 主页（学习中心）
-│   ├── study_page.dart          # 学习页面
-│   ├── test_page.dart           # 测试页面
-│   ├── review_page.dart         # 复习页面
-│   ├── word_book_page.dart      # 单词本页面
-│   ├── settings_page.dart       # 设置页面
-│   ├── test_history_page.dart   # 测试历史页面
-│   ├── test_result_page.dart    # 测试结果页面
-│   ├── test_settings_page.dart  # 测试设置页面
-│   └── new_home_page.dart      # 新主页（备用）
-├── providers/                   # 状态管理
-│   ├── theme_provider.dart      # 主题切换提供者
-│   └── study_progress_provider.dart # 学习进度状态管理
-├── services/                    # 服务层
-│   ├── audio_service.dart       # 音频播放服务
-│   ├── platform_storage.dart    # 跨平台存储服务
-│   ├── progress_persistence_service.dart # 进度持久化服务
-│   ├── data_manager.dart        # 数据管理服务
-│   └── data_consistency_service.dart # 数据一致性服务
-├── assets/                      # 资源文件
-│   └── images/                 # 图片资源
-```
-
-## 运行项目
-
-### 前置要求
-- Flutter SDK 3.22.0+
-- Dart SDK 3.4.0+
-- Android Studio / VS Code
-- Android SDK / iOS Simulator（用于运行和测试）
-
-### 安装步骤
-
-1. 克隆项目到本地
-```bash
-git clone https://gitee.com/xds2026/micro-words.git
-cd micro-words
-```
-
-2. 安装依赖
 ```bash
 flutter pub get
+flutter run
 ```
 
-3. 运行项目
+常用运行方式：
+
 ```bash
 # Web
 flutter run -d chrome
 
 # Android
 flutter run -d android
-
-# iOS
-flutter run -d ios
 
 # Windows
 flutter run -d windows
@@ -131,118 +60,136 @@ flutter run -d macos
 flutter run -d linux
 ```
 
-## 使用指南
+> Windows 环境运行包含插件的测试或构建时，如遇 symlink 检查，请开启 Developer Mode。
 
-### 单词表功能
+## 项目结构
 
-1. **创建单词表**：在主页或设置页面，点击「创建单词表」按钮，输入单词表名称即可创建
-2. **切换单词表**：在主页顶部的单词表选择器中，点击当前单词表名称，在下拉列表中选择要切换的单词表
-3. **管理单词表**：在设置页面，点击「单词表管理」选项，进入单词表管理界面，可以编辑或删除单词表
-4. **添加单词到单词表**：在单词本页面，长按单词，选择「添加到单词表」，选择目标单词表即可
-5. **学习特定单词表**：切换到目标单词表后，点击「开始学习」按钮，系统会自动加载该单词表中的单词进行学习
-6. **测试特定单词表**：切换到目标单词表后，点击「开始测试」按钮，系统会自动加载该单词表中的单词进行测试
-7. **复习特定单词表**：切换到目标单词表后，点击「开始复习」按钮，系统会自动加载该单词表中需要复习的单词
-
-### 乱序学习
-
-在单词本页面，选择「乱序学习」选项，系统会随机打乱单词顺序，帮助用户更有效地记忆单词。乱序状态会保持固定，确保学习体验的一致性。
-
-### 学习进度持久化
-
-系统会自动保存学习进度，包括：
-- 单词掌握状态
-- 学习和复习记录
-- 连续学习天数
-- 每日学习目标完成情况
-- 签到记录
-
-即使关闭应用或刷新页面，再次打开时学习进度会保持不变。
-
-### 学习中心功能
-
-1. **签到功能**：在学习中心页面，点击签到按钮完成每日签到，记录学习习惯
-2. **学习记录**：点击学习记录卡片查看连续学习天数和签到历史日历
-3. **学习统计**：查看总学习单词数、已掌握单词数、总学习时长、待复习单词数等统计数据
-4. **今日进度**：实时查看今日学习和复习进度，包括进度条和完成百分比
-
-### 测试功能
-
-1. **开始测试**：在主页点击「测试」按钮，进入测试页面
-2. **测试设置**：在测试页面点击设置按钮，自定义测试参数（题目数量、时间限制等）
-3. **查看结果**：测试完成后，查看测试结果页面，了解答题情况和得分
-4. **测试历史**：在测试页面点击历史按钮，查看所有历史测试记录
-
-### 复习功能
-
-1. **开始复习**：在主页点击「复习」按钮，进入复习页面
-2. **复习模式**：系统会根据记忆曲线推荐需要复习的单词
-3. **复习记录**：复习完成后，系统会自动记录复习结果
-
-### 设置功能
-
-1. **主题切换**：在设置页面，选择「主题」选项，切换深色/浅色主题
-2. **音频设置**：在设置页面，调整音频音量和语速
-3. **学习目标设置**：在设置页面，自定义每日学习和复习目标
-4. **数据管理**：在设置页面，导入/导出单词数据，备份学习进度
-5. **重置为默认单词**：在设置页面，点击「重置为默认50个单词」按钮，系统会删除现有单词数据，创建50个默认单词
-
-### 重置为默认单词
-
-在设置页面，点击「重置为默认50个单词」按钮，系统会：
-1. 删除现有单词数据
-2. 创建50个默认单词
-3. 将这些单词添加到「默认单词表」中
-4. 设置「默认单词表」为当前学习内容
-
-## 开发说明
-
-### 状态管理
-
-项目使用 Provider 进行状态管理，主要包括：
-- ThemeProvider：管理主题切换
-- StudyProgressProvider：管理学习进度数据
-
-### 数据持久化
-
-使用文件 I/O 和 JSON 序列化进行数据存储：
-- 单词数据：存储在本地 JSON 文件
-- 单词表数据：存储在本地 JSON 文件
-- 学习进度：存储在本地 JSON 文件
-- 测试记录：存储在本地 JSON 文件
-
-### 数据一致性
-
-内置数据一致性服务，确保数据的完整性和一致性：
-- 数据验证：启动时验证数据完整性
-- 数据修复：自动修复损坏的数据
-- 数据备份：自动创建数据备份
-
-## 测试
-
-项目包含完整的测试套件：
-- 单元测试：测试数据模型和服务
-- Widget 测试：测试 UI 组件
-- 集成测试：测试完整的应用流程
-
-运行测试：
-```bash
-# 运行所有测试
-flutter test
-
-# 运行特定测试
-flutter test test/models/word_test.dart
+```text
+weidanci/
+├── lib/
+│   ├── main.dart                         # 应用入口、主题和路由配置
+│   ├── models/                           # 纯数据模型
+│   │   ├── word.dart                     # 单词模型
+│   │   ├── word_list.dart                # 单词表模型
+│   │   ├── study_progress.dart           # 学习进度模型
+│   │   ├── settings.dart                 # 设置模型
+│   │   ├── quiz_record.dart              # 测验记录模型
+│   │   └── quiz_settings.dart            # 测验设置模型
+│   ├── pages/                            # 页面组件
+│   │   ├── splash_page.dart              # 启动页
+│   │   ├── home_page.dart                # 主页 / 学习中心
+│   │   ├── study_page.dart               # 单词学习页
+│   │   ├── review_page.dart              # 复习页
+│   │   ├── quiz_page.dart                # 自我测验页
+│   │   ├── quiz_settings_page.dart       # 测验设置页
+│   │   ├── quiz_result_page.dart         # 测验结果页
+│   │   ├── quiz_history_page.dart        # 测验历史页
+│   │   ├── word_book_page.dart           # 单词本页
+│   │   ├── settings_page.dart            # 设置页
+│   │   └── new_home_page.dart            # 备用主页组件
+│   ├── providers/                        # 状态管理
+│   │   ├── theme_provider.dart           # 主题状态
+│   │   └── study_progress_provider.dart  # 学习进度状态
+│   └── services/                         # 业务服务和数据访问
+│       ├── audio_service.dart            # 发音服务
+│       ├── data_manager.dart             # SQLite 数据管理
+│       ├── data_consistency_service.dart # 数据一致性检查与修复
+│       ├── platform_storage.dart         # 跨平台存储封装
+│       ├── progress_persistence_service.dart # 学习进度持久化
+│       ├── word_storage.dart             # 单词存储服务
+│       └── word_list_storage.dart        # 单词表存储服务
+├── test/
+│   ├── models/                           # 模型和服务单元测试
+│   └── pages/                            # 页面 Widget 测试
+├── integration_test/
+│   ├── app_smoke_test.dart               # 应用启动冒烟测试
+│   └── app_flow_test.dart                # 主要用户流程集成测试
+├── assets/
+│   └── images/                           # 应用图标和图片资源
+├── android/                              # Android 平台工程
+├── ios/                                  # iOS 平台工程
+├── web/                                  # Web 平台工程
+├── windows/                              # Windows 平台工程
+├── macos/                                # macOS 平台工程
+├── linux/                                # Linux 平台工程
+├── pubspec.yaml                          # 依赖与资源配置
+└── analysis_options.yaml                 # Dart/Flutter 静态检查配置
 ```
 
-## 贡献
+## 使用说明
 
-欢迎贡献代码，提交 Issue 或 Pull Request 来改进这个项目。
+### 学习单词
+
+1. 进入学习页面或学习中心
+2. 查看单词、音标、释义和例句
+3. 根据掌握情况标记「不认识」「模糊」「认识」
+4. 系统自动记录学习进度和掌握状态
+
+### 管理单词本
+
+1. 在单词本页面查看当前词库
+2. 使用搜索和排序快速定位单词
+3. 添加、编辑、删除或收藏单词
+4. 通过单词表功能管理不同学习范围
+
+### 开始测验
+
+1. 进入测验页面
+2. 可在测验设置中调整题目数量、题型等参数
+3. 完成测验后查看结果
+4. 在测验历史中回顾过往记录
+
+### 学习统计
+
+学习中心会展示：
+
+- 今日学习进度
+- 连续学习天数
+- 总学习单词数
+- 已掌握单词数
+- 学习时长
+- 签到记录
+
+## 开发与测试
+
+```bash
+# 获取依赖
+flutter pub get
+
+# 静态分析
+flutter analyze
+
+# 运行全部测试
+flutter test
+
+# 运行页面渲染测试
+flutter test --no-pub test/pages/page_rendering_test.dart
+
+# 运行集成测试
+flutter test integration_test/app_smoke_test.dart
+
+# 构建 Android Debug APK
+flutter build apk --debug
+```
+
+## 数据存储
+
+项目的数据层集中在 `lib/services/`：
+
+- `data_manager.dart` 负责 SQLite 数据库初始化和 CRUD 操作
+- `word_storage.dart` 负责单词数据访问和默认单词初始化
+- `word_list_storage.dart` 负责单词表数据访问和当前单词表管理
+- `progress_persistence_service.dart` 负责学习进度自动保存
+- `data_consistency_service.dart` 负责启动时的数据校验和修复
+- `platform_storage.dart` 提供跨平台存储能力
+
+## 维护说明
+
+- 日志和临时 diff 文件已加入 `.gitignore`，避免再次污染仓库
+- Flutter 生成目录如 `.dart_tool/`、`build/`、平台 ephemeral 文件不应提交
+- Android 在 Windows 环境下已关闭 Kotlin 增量编译，以规避跨盘缓存路径问题
+- 如需在全新环境中直接使用 Gradle wrapper，请确认 `android/gradlew`、`android/gradlew.bat` 和 `android/gradle/wrapper/gradle-wrapper.jar` 已按团队规范管理
 
 ## 许可证
 
-MIT License
-
-## 联系方式
-
-如有问题或建议，请通过以下方式联系：
-- Gitee：https://gitee.com/xds2026/micro-words
-- 提交 Issue：https://gitee.com/xds2026/micro-words/issues
+本项目采用木兰宽松许可证，第 2 版（Mulan PSL v2）。

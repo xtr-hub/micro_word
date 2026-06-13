@@ -1,23 +1,20 @@
-/// JSON编码解码库，用于将单词列表转换为JSON字符串和从JSON字符串转换为单词列表
+// JSON编码解码库，用于将单词列表转换为JSON字符串和从JSON字符串转换为单词列表
 import 'dart:convert';
 
-/// Flutter调试库，用于输出调试信息
+// Flutter调试库，用于输出调试信息
 import 'package:flutter/foundation.dart';
 
-/// 跨平台存储服务
-import '../services/platform_storage.dart';
+// Word模型类，定义了单词的数据结构
+import '../models/word.dart';
 
-/// Word模型类，定义了单词的数据结构
-import 'word.dart';
+// WordList模型类，定义了单词表的数据结构
+import '../models/word_list.dart';
 
-/// WordList模型类，定义了单词表的数据结构
-import 'word_list.dart';
-
-/// 单词表存储服务类
+// 单词表存储服务类
 import 'word_list_storage.dart';
 
-/// 数据管理服务
-import '../services/data_manager.dart';
+// 数据管理服务
+import 'data_manager.dart';
 
 /// 单词存储服务类
 ///

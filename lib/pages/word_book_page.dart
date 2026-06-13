@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/word.dart';
-import '../models/word_storage.dart';
+import '../services/word_storage.dart';
 import '../models/word_list.dart';
-import '../models/word_list_storage.dart';
+import '../services/word_list_storage.dart';
 import '../models/settings.dart';
 
 // 单词本页面

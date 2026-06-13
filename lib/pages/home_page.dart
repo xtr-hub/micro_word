@@ -5,8 +5,8 @@ import '../models/study_progress.dart';
 import '../providers/study_progress_provider.dart';
 import './study_page.dart';
 import './review_page.dart';
-import './test_page.dart';
-import './test_history_page.dart';
+import './quiz_page.dart';
+import './quiz_history_page.dart';
 import './word_book_page.dart';
 import './settings_page.dart';
 
@@ -55,25 +55,28 @@ class _HomePageState extends State<HomePage> {
   // 重新加载学习进度数据
   Future<void> _reloadProgress() async {
     debugPrint('重新加载学习进度数据');
-    final progressProvider = Provider.of<StudyProgressProvider>(context, listen: false);
+    final progressProvider = Provider.of<StudyProgressProvider>(
+      context,
+      listen: false,
+    );
     await progressProvider.reloadProgress();
   }
 
   // 构建学习中心页面
   Widget _buildLearningCenter() {
     debugPrint('构建学习中心页面');
-    
+
     return Consumer<StudyProgressProvider>(
       builder: (context, provider, child) {
         final isLoading = provider.isLoading;
         final progress = provider.progress;
-        
-        debugPrint('Consumer 构建学习中心页面，isLoading: $isLoading, progress: $progress');
-        
+
+        debugPrint(
+          'Consumer 构建学习中心页面，isLoading: $isLoading, progress: $progress',
+        );
+
         if (isLoading) {
-          return Center(
-            child: CircularProgressIndicator(color: Colors.blue),
-          );
+          return Center(child: CircularProgressIndicator(color: Colors.blue));
         } else if (progress == null) {
           return Center(
             child: Column(
@@ -119,7 +122,11 @@ class _HomePageState extends State<HomePage> {
                           child: GestureDetector(
                             onTap: () async {
                               debugPrint('签到按钮被点击');
-                              final progressProvider = Provider.of<StudyProgressProvider>(context, listen: false);
+                              final progressProvider =
+                                  Provider.of<StudyProgressProvider>(
+                                    context,
+                                    listen: false,
+                                  );
                               bool success = await progressProvider.checkIn();
                               if (success) {
                                 // 签到成功，添加提示
@@ -198,17 +205,19 @@ class _HomePageState extends State<HomePage> {
                             child: GestureDetector(
                               onTap: () {
                                 debugPrint('学习记录卡片被点击，开始处理点击事件');
-                                
+
                                 final startTime = DateTime.now();
-                                
+
                                 setState(() {
                                   debugPrint('开始更新状态，设置_showCalendar = true');
                                   _showCalendar = true;
                                 });
-                                
+
                                 final endTime = DateTime.now();
                                 final duration = endTime.difference(startTime);
-                                debugPrint('状态更新完成，耗时: ${duration.inMilliseconds}ms');
+                                debugPrint(
+                                  '状态更新完成，耗时: ${duration.inMilliseconds}ms',
+                                );
                                 debugPrint('点击事件处理完成');
                               },
                               child: Container(
@@ -236,7 +245,8 @@ class _HomePageState extends State<HomePage> {
                                   children: [
                                     // 日历图标和标题
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       children: [
                                         Icon(
                                           Icons.calendar_today,
@@ -258,7 +268,8 @@ class _HomePageState extends State<HomePage> {
 
                                     // 连续学习天数
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
                                       crossAxisAlignment:
                                           CrossAxisAlignment.baseline,
                                       textBaseline: TextBaseline.alphabetic,
@@ -440,7 +451,7 @@ class _HomePageState extends State<HomePage> {
     // 构建页面列表
     final pages = [
       _buildLearningCenter(), // 学习中心页面，包含Learn和Review按钮
-      TestPage(),
+      QuizPage(),
       WordBookPage(),
       SettingsPage(
         onSettingsSaved: () {
@@ -478,11 +489,10 @@ class _HomePageState extends State<HomePage> {
                 onPressed: () async {
                   final result = await Navigator.pushNamed(
                     context,
-                    '/test_settings',
+                    '/quiz_settings',
                   );
                   // 如果返回了设置结果，通知测试页面更新
-                  if (result != null &&
-                      result is Map) {
+                  if (result != null && result is Map) {
                     debugPrint('HomePage: 接收设置数据: $result');
                     // 重新构建测试页面
                     setState(() {
@@ -508,7 +518,7 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => TestHistoryPage()),
+                  MaterialPageRoute(builder: (context) => QuizHistoryPage()),
                 );
               },
               tooltip: '测试历史',

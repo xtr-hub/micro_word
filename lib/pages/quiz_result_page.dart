@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/test_record.dart';
+import '../models/quiz_record.dart';
 
 /// 测试结果页面组件
 ///
@@ -8,18 +8,18 @@ import '../models/test_record.dart';
 /// - 所有题目的作答状态
 /// - 错题详情展开功能
 /// - 错题筛选功能
-class TestResultPage extends StatefulWidget {
+class QuizResultPage extends StatefulWidget {
   /// 测试记录
-  final TestRecord testRecord;
+  final QuizRecord testRecord;
 
   /// 创建测试结果页面状态对象
-  const TestResultPage({Key? key, required this.testRecord}) : super(key: key);
+  const QuizResultPage({Key? key, required this.testRecord}) : super(key: key);
 
   @override
-  _TestResultPageState createState() => _TestResultPageState();
+  _QuizResultPageState createState() => _QuizResultPageState();
 }
 
-class _TestResultPageState extends State<TestResultPage> {
+class _QuizResultPageState extends State<QuizResultPage> {
   /// 是否只显示错题
   bool _showOnlyWrong = false;
 
@@ -121,7 +121,7 @@ class _TestResultPageState extends State<TestResultPage> {
                 style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
               ),
               Text(
-                widget.testRecord.testMode == TestMode.multipleChoice
+                widget.testRecord.testMode == QuizMode.multipleChoice
                     ? '选择题'
                     : '填空题',
                 style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
@@ -178,7 +178,7 @@ class _TestResultPageState extends State<TestResultPage> {
   }
 
   /// 构建题目项
-  Widget _buildQuestionItem(TestQuestion question, int index) {
+  Widget _buildQuestionItem(QuizQuestion question, int index) {
     // 获取状态颜色和文字
     Color statusColor;
     String statusText;
@@ -298,7 +298,7 @@ class _TestResultPageState extends State<TestResultPage> {
   }
 
   /// 构建题目详情
-  Widget _buildQuestionDetails(TestQuestion question) {
+  Widget _buildQuestionDetails(QuizQuestion question) {
     return Container(
       padding: EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -309,13 +309,13 @@ class _TestResultPageState extends State<TestResultPage> {
         children: [
           // 题目类型
           Text(
-            question.mode == TestMode.multipleChoice ? '选择题' : '填空题',
+            question.mode == QuizMode.multipleChoice ? '选择题' : '填空题',
             style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
           ),
           SizedBox(height: 10),
 
           // 选项（仅选择题有）
-          if (question.mode == TestMode.multipleChoice &&
+          if (question.mode == QuizMode.multipleChoice &&
               question.options != null)
             Column(
               children: [
@@ -420,7 +420,7 @@ class _TestResultPageState extends State<TestResultPage> {
                 Text('解析：', style: TextStyle(fontWeight: FontWeight.bold)),
                 SizedBox(height: 5),
                 Text(
-                  question.mode == TestMode.multipleChoice
+                  question.mode == QuizMode.multipleChoice
                       ? '本题考查单词的释义识别。正确理解单词的含义是掌握词汇的基础，建议结合例句加深记忆。'
                       : '本题考查单词的拼写能力。根据释义写出正确的单词是词汇学习的重要环节，建议多进行听写练习。',
                   style: TextStyle(fontSize: 14, color: Colors.grey.shade700),

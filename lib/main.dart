@@ -25,11 +25,11 @@ import 'pages/study_page.dart';
 /// 复习页面组件
 import 'pages/review_page.dart';
 
-/// 测试页面组件
-import 'pages/test_page.dart';
+/// 自测页面组件
+import 'pages/quiz_page.dart';
 
-/// 测试设置页面组件
-import 'pages/test_settings_page.dart';
+/// 自测设置页面组件
+import 'pages/quiz_settings_page.dart';
 
 /// 单词本页面组件
 import 'pages/word_book_page.dart';
@@ -226,8 +226,8 @@ class WordApp extends StatelessWidget {
         '/home': (context) => HomePage(), // 主页面路由
         '/study': (context) => StudyPage(), // 学习页面路由
         '/review': (context) => ReviewPage(), // 复习页面路由
-        '/test': (context) => TestPage(), // 测试页面路由
-        '/test_settings': (context) => TestSettingsPage(), // 测试设置页面路由
+        '/quiz': (context) => QuizPage(), // 自测页面路由
+        '/quiz_settings': (context) => QuizSettingsPage(), // 自测设置页面路由
         '/wordbook': (context) => WordBookPage(), // 单词本页面路由
         '/settings': (context) => SettingsPage(), // 设置页面路由
       },

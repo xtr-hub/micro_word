@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wei_dan_ci/models/word.dart';
-import 'package:wei_dan_ci/models/word_storage.dart';
+import 'package:wei_dan_ci/services/word_storage.dart';
 
 void main() {
   // 初始化Flutter绑定

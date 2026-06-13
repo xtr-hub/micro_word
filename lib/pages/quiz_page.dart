@@ -3,16 +3,16 @@ import 'dart:io'; // 文件操作库
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart'; // Flutter UI组件库
 import '../models/word.dart'; // 单词数据模型
-import '../models/word_storage.dart'; // 单词存储服务
+import '../services/word_storage.dart'; // 单词存储服务
 import '../models/word_list.dart'; // 单词表数据模型
-import '../models/word_list_storage.dart'; // 单词表存储服务
+import '../services/word_list_storage.dart'; // 单词表存储服务
 import '../models/study_progress.dart'; // 学习进度模型
 import '../models/settings.dart'; // 用户设置模型
-import '../models/test_record.dart'; // 测试记录模型
-import '../models/test_settings.dart'; // 测试设置模型
+import '../models/quiz_record.dart'; // 测试记录模型
+import '../models/quiz_settings.dart'; // 测试设置模型
 import '../services/audio_service.dart'; // 音频播放服务
-import './test_result_page.dart'; // 测试结果页面
-import './test_history_page.dart'; // 测试历史页面
+import './quiz_result_page.dart'; // 测试结果页面
+import './quiz_history_page.dart'; // 测试历史页面
 
 /// 测试页面
 ///
@@ -24,7 +24,7 @@ import './test_history_page.dart'; // 测试历史页面
 /// - 测试完成后显示详细结果
 /// - 测试完成后显示详细结果
 /// - 根据测试结果更新单词学习状态
-class TestPage extends StatefulWidget {
+class QuizPage extends StatefulWidget {
   /// 测试单词数量
   final int testWordCount;
 
@@ -35,7 +35,7 @@ class TestPage extends StatefulWidget {
   final String? customWordListPath;
 
   /// 构造函数
-  const TestPage({
+  const QuizPage({
     Key? key,
     this.testWordCount = 10,
     this.selectedWordList,
@@ -44,13 +44,13 @@ class TestPage extends StatefulWidget {
 
   /// 创建页面状态对象
   @override
-  _TestPageState createState() => _TestPageState();
+  _QuizPageState createState() => _QuizPageState();
 }
 
-/// TestPage 的状态管理类
-class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
+/// QuizPage 的状态管理类
+class _QuizPageState extends State<QuizPage> with WidgetsBindingObserver {
   /// 当前测试模式
-  TestMode _testMode = TestMode.multipleChoice;
+  QuizMode _testMode = QuizMode.multipleChoice;
 
   /// 所有单词列表
   late List<Word> _words;
@@ -94,7 +94,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   late Settings _settings;
 
   /// 测试设置对象
-  late TestSettings _testSettings;
+  late QuizSettings _testSettings;
 
   /// 学习时长计时器
   Timer? _studyTimer;
@@ -202,21 +202,21 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
 
   /// 当widget的参数发生变化时调用
   @override
-  void didUpdateWidget(TestPage oldWidget) {
+  void didUpdateWidget(QuizPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    debugPrint('TestPage: didUpdateWidget被调用');
+    debugPrint('QuizPage: didUpdateWidget被调用');
     debugPrint(
-      'TestPage: 旧参数 - testWordCount: ${oldWidget.testWordCount}, selectedWordList: ${oldWidget.selectedWordList}, customWordListPath: ${oldWidget.customWordListPath}',
+      'QuizPage: 旧参数 - testWordCount: ${oldWidget.testWordCount}, selectedWordList: ${oldWidget.selectedWordList}, customWordListPath: ${oldWidget.customWordListPath}',
     );
     debugPrint(
-      'TestPage: 新参数 - testWordCount: ${widget.testWordCount}, selectedWordList: ${widget.selectedWordList}, customWordListPath: ${widget.customWordListPath}',
+      'QuizPage: 新参数 - testWordCount: ${widget.testWordCount}, selectedWordList: ${widget.selectedWordList}, customWordListPath: ${widget.customWordListPath}',
     );
 
     // 检查widget的参数是否发生变化
     if (oldWidget.testWordCount != widget.testWordCount ||
         oldWidget.selectedWordList != widget.selectedWordList ||
         oldWidget.customWordListPath != widget.customWordListPath) {
-      debugPrint('TestPage: 参数发生变化，重新加载数据');
+      debugPrint('QuizPage: 参数发生变化，重新加载数据');
       // 参数发生变化，重新加载数据
       _loadData();
     }
@@ -238,7 +238,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     final wordListsFuture = WordListStorage.loadWordLists();
 
     // 加载测试设置
-    final testSettingsFuture = TestSettingsStorage.loadTestSettings();
+    final testSettingsFuture = QuizSettingsStorage.loadQuizSettings();
 
     final results = await Future.wait([
       wordsFuture,
@@ -254,19 +254,19 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     _settings = results[2] as Settings;
     _currentWordList = results[3] as WordList;
     final wordLists = results[4] as List<WordList>;
-    _testSettings = results[5] as TestSettings;
+    _testSettings = results[5] as QuizSettings;
 
     // 如果当前单词表的wordIds列表为空，将所有单词的ID添加到当前单词表中
     if (_currentWordList.wordIds.isEmpty && _words.isNotEmpty) {
       // 更新当前单词表的wordIds列表
       _currentWordList.wordIds = _words.map((word) => word.id).toList();
-      
+
       // 同时更新wordLists列表中的对应单词表
       final index = wordLists.indexWhere((wl) => wl.id == _currentWordList.id);
       if (index != -1) {
         wordLists[index] = _currentWordList;
       }
-      
+
       // 保存更新后的单词表
       await WordListStorage.saveWordLists(wordLists);
     }
@@ -394,10 +394,10 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     bool isCorrect = false;
 
     // 根据测试模式检查答案是否正确
-    if (_testMode == TestMode.multipleChoice) {
+    if (_testMode == QuizMode.multipleChoice) {
       // 选择题：检查选择的释义是否正确
       isCorrect = _selectedAnswer.value == currentWord.meaning;
-    } else if (_testMode == TestMode.blankFill) {
+    } else if (_testMode == QuizMode.blankFill) {
       // 填空题：检查输入的单词是否正确（忽略大小写和前后空格）
       isCorrect =
           _selectedAnswer.value?.trim().toLowerCase() ==
@@ -426,12 +426,12 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         _currentIndex++;
         _selectedAnswer.value = null; // 清空选中答案
         // 如果是填空题，清空输入框内容
-        if (_testMode == TestMode.blankFill) {
+        if (_testMode == QuizMode.blankFill) {
           _blankFillController.clear();
         }
       } else {
         // 测试完成，生成测试记录
-        _generateTestRecord();
+        _generateQuizRecord();
       }
     });
 
@@ -449,7 +449,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   }
 
   /// 生成测试记录
-  void _generateTestRecord() async {
+  void _generateQuizRecord() async {
     // 停止学习时长计时器并计算测试时长
     _stopStudyTimer();
     final testDuration = _sessionStudyTime;
@@ -459,18 +459,18 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     final score = total > 0 ? (_correctCount / total * 100).toInt() : 0;
 
     // 生成题目记录
-    final questions = <TestQuestion>[];
+    final questions = <QuizQuestion>[];
     for (int i = 0; i < _testWords.length; i++) {
       final word = _testWords[i];
       final userAnswer = _userAnswers[i]; // 从映射中获取用户答案
-      TestQuestion question;
-      if (_testMode == TestMode.multipleChoice) {
+      QuizQuestion question;
+      if (_testMode == QuizMode.multipleChoice) {
         // 选择题
         final options = _generateOptions(word.meaning);
         bool isCorrect = userAnswer == word.meaning;
-        question = TestQuestion(
+        question = QuizQuestion(
           id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
-          mode: TestMode.multipleChoice,
+          mode: QuizMode.multipleChoice,
           question: word.word,
           userAnswer: userAnswer,
           correctAnswer: word.meaning,
@@ -483,9 +483,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         // 填空题
         bool isCorrect =
             userAnswer?.trim().toLowerCase() == word.word.toLowerCase();
-        question = TestQuestion(
+        question = QuizQuestion(
           id: '${i}_${DateTime.now().millisecondsSinceEpoch}',
-          mode: TestMode.blankFill,
+          mode: QuizMode.blankFill,
           question: word.meaning,
           userAnswer: userAnswer,
           correctAnswer: word.word,
@@ -498,7 +498,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     }
 
     // 生成测试记录
-    final testRecord = TestRecord(
+    final testRecord = QuizRecord(
       testTime: DateTime.now(),
       testDuration: testDuration,
       totalQuestions: total,
@@ -511,13 +511,13 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
     );
 
     // 保存测试记录
-    await TestRecordStorage.addRecord(testRecord);
+    await QuizRecordStorage.addRecord(testRecord);
 
     // 跳转到测试结果页面
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => TestResultPage(testRecord: testRecord),
+        builder: (context) => QuizResultPage(testRecord: testRecord),
       ),
     );
   }
@@ -631,9 +631,9 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
                 alignment: WrapAlignment.center, // 居中对齐
                 children: [
                   // 选择题按钮
-                  _testModeButton('选择题', TestMode.multipleChoice),
+                  _testModeButton('选择题', QuizMode.multipleChoice),
                   // 填空题按钮
-                  _testModeButton('填空题', TestMode.blankFill),
+                  _testModeButton('填空题', QuizMode.blankFill),
                 ],
               ),
             ),
@@ -653,7 +653,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
   /// - mode: 按钮对应的测试模式
   ///
   /// 返回：构建好的测试模式按钮Widget
-  Widget _testModeButton(String text, TestMode mode) {
+  Widget _testModeButton(String text, QuizMode mode) {
     // 判断当前按钮是否被选中
     final isSelected = _testMode == mode;
     // 判断当前是否为深色模式
@@ -782,7 +782,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
                   // 根据测试模式显示不同内容
                   // 选择题：显示单词
                   // 填空题：显示释义
-                  _testMode == TestMode.multipleChoice
+                  _testMode == QuizMode.multipleChoice
                       ? currentWord.word
                       : currentWord.meaning,
                   style: TextStyle(
@@ -796,8 +796,8 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
               ),
               SizedBox(width: 15), // 单词与发音按钮间距
               // 音频播放按钮
-              if (_testMode == TestMode.multipleChoice ||
-                  _testMode == TestMode.blankFill) // 两种模式都显示播放按钮
+              if (_testMode == QuizMode.multipleChoice ||
+                  _testMode == QuizMode.blankFill) // 两种模式都显示播放按钮
                 _AnimatedPlayButton(
                   onPressed: () => _speakWord(currentWord.word),
                   size: 36,
@@ -807,7 +807,7 @@ class _TestPageState extends State<TestPage> with WidgetsBindingObserver {
         ),
 
         // 根据测试模式显示不同的测试内容
-        if (_testMode == TestMode.multipleChoice)
+        if (_testMode == QuizMode.multipleChoice)
           // 选择题：显示选项
           _buildMultipleChoiceOptions(currentWord)
         else

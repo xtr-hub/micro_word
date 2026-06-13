@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../models/word_list.dart';
-import '../models/word_list_storage.dart';
+import '../services/word_list_storage.dart';
 import '../models/word.dart';
-import '../models/word_storage.dart';
-import '../models/test_settings.dart';
-import './test_page.dart';
+import '../services/word_storage.dart';
+import '../models/quiz_settings.dart';
+import './quiz_page.dart';
 
 /// 测试参数设置页面
 ///
@@ -17,12 +17,12 @@ import './test_page.dart';
 /// - 允许用户选择测试范围（单词表）
 /// - 支持上传自定义单词表文件
 /// - 提供参数验证机制
-class TestSettingsPage extends StatefulWidget {
+class QuizSettingsPage extends StatefulWidget {
   @override
-  _TestSettingsPageState createState() => _TestSettingsPageState();
+  _QuizSettingsPageState createState() => _QuizSettingsPageState();
 }
 
-class _TestSettingsPageState extends State<TestSettingsPage> {
+class _QuizSettingsPageState extends State<QuizSettingsPage> {
   /// 测试单词数量
   int _testWordCount = 10;
 
@@ -62,7 +62,7 @@ class _TestSettingsPageState extends State<TestSettingsPage> {
       final wordLists = await WordListStorage.loadWordLists();
 
       // 加载测试设置
-      final testSettings = await TestSettingsStorage.loadTestSettings();
+      final testSettings = await QuizSettingsStorage.loadQuizSettings();
 
       setState(() {
         _wordLists = wordLists;
@@ -181,13 +181,13 @@ class _TestSettingsPageState extends State<TestSettingsPage> {
     }
 
     // 创建测试设置对象
-    final testSettings = TestSettings(
+    final testSettings = QuizSettings(
       testWordCount: _testWordCount,
       customWordListPath: _customWordListPath,
     );
 
     // 保存测试设置
-    final saveSuccess = await TestSettingsStorage.saveTestSettings(
+    final saveSuccess = await QuizSettingsStorage.saveQuizSettings(
       testSettings,
       _selectedWordList,
     );
@@ -214,7 +214,7 @@ class _TestSettingsPageState extends State<TestSettingsPage> {
       'selectedWordList': _selectedWordList,
       'customWordListPath': _customWordListPath,
     };
-    debugPrint('TestSettingsPage: 返回设置数据: $returnData');
+    debugPrint('QuizSettingsPage: 返回设置数据: $returnData');
     Navigator.pop(context, returnData);
   }
 

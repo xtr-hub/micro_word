@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart';
 import '../services/platform_storage.dart';
 
 /// 测试模式枚举
-enum TestMode {
+enum QuizMode {
   multipleChoice, // 选择题
   blankFill, // 填空题
 }
@@ -21,12 +21,12 @@ enum QuestionStatus {
 }
 
 /// 测试题目记录类
-class TestQuestion {
+class QuizQuestion {
   /// 题目ID
   final String id;
 
   /// 题型
-  final TestMode mode;
+  final QuizMode mode;
 
   /// 题干（选择题：单词，填空题：释义）
   final String question;
@@ -44,7 +44,7 @@ class TestQuestion {
   final List<String>? options;
 
   /// 构造函数
-  TestQuestion({
+  QuizQuestion({
     required this.id,
     required this.mode,
     required this.question,
@@ -54,11 +54,11 @@ class TestQuestion {
     this.options,
   });
 
-  /// 从JSON映射创建TestQuestion实例
-  factory TestQuestion.fromJson(Map<String, dynamic> json) {
-    return TestQuestion(
+  /// 从JSON映射创建QuizQuestion实例
+  factory QuizQuestion.fromJson(Map<String, dynamic> json) {
+    return QuizQuestion(
       id: json['id'],
-      mode: TestMode.values[json['mode']],
+      mode: QuizMode.values[json['mode']],
       question: json['question'],
       userAnswer: json['userAnswer'],
       correctAnswer: json['correctAnswer'],
@@ -69,7 +69,7 @@ class TestQuestion {
     );
   }
 
-  /// 将TestQuestion实例转换为JSON映射
+  /// 将QuizQuestion实例转换为JSON映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -84,7 +84,7 @@ class TestQuestion {
 }
 
 /// 测试记录类
-class TestRecord {
+class QuizRecord {
   /// 测试ID
   final String id;
 
@@ -104,7 +104,7 @@ class TestRecord {
   final int score;
 
   /// 测试模式
-  final TestMode testMode;
+  final QuizMode testMode;
 
   /// 测试单词数
   final int testWordCount;
@@ -113,10 +113,10 @@ class TestRecord {
   final String testRange;
 
   /// 题目记录列表
-  final List<TestQuestion> questions;
+  final List<QuizQuestion> questions;
 
   /// 构造函数
-  TestRecord({
+  QuizRecord({
     String? id,
     required this.testTime,
     required this.testDuration,
@@ -129,25 +129,25 @@ class TestRecord {
     required this.questions,
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
-  /// 从JSON映射创建TestRecord实例
-  factory TestRecord.fromJson(Map<String, dynamic> json) {
-    return TestRecord(
+  /// 从JSON映射创建QuizRecord实例
+  factory QuizRecord.fromJson(Map<String, dynamic> json) {
+    return QuizRecord(
       id: json['id'],
       testTime: DateTime.parse(json['testTime']),
       testDuration: json['testDuration'],
       totalQuestions: json['totalQuestions'],
       correctQuestions: json['correctQuestions'],
       score: json['score'],
-      testMode: TestMode.values[json['testMode']],
+      testMode: QuizMode.values[json['testMode']],
       testWordCount: json['testWordCount'],
       testRange: json['testRange'],
       questions: (json['questions'] as List)
-          .map((q) => TestQuestion.fromJson(q))
+          .map((q) => QuizQuestion.fromJson(q))
           .toList(),
     );
   }
 
-  /// 将TestRecord实例转换为JSON映射
+  /// 将QuizRecord实例转换为JSON映射
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -177,12 +177,12 @@ class TestRecord {
 }
 
 /// 测试记录存储服务
-class TestRecordStorage {
+class QuizRecordStorage {
   /// 存储键名称
   static const String _storageKey = 'test_records';
 
   /// 保存测试记录列表
-  static Future<void> saveRecords(List<TestRecord> records) async {
+  static Future<void> saveRecords(List<QuizRecord> records) async {
     try {
       final jsonRecords = records.map((record) => record.toJson()).toList();
       final jsonString = jsonEncode(jsonRecords);
@@ -193,14 +193,14 @@ class TestRecordStorage {
   }
 
   /// 加载测试记录列表
-  static Future<List<TestRecord>> loadRecords() async {
+  static Future<List<QuizRecord>> loadRecords() async {
     try {
       final jsonString = await PlatformStorage.loadData(_storageKey);
       if (jsonString == null) {
         return [];
       }
       final jsonRecords = jsonDecode(jsonString) as List;
-      return jsonRecords.map((json) => TestRecord.fromJson(json)).toList();
+      return jsonRecords.map((json) => QuizRecord.fromJson(json)).toList();
     } catch (e) {
       debugPrint('加载测试记录失败: $e');
       return [];
@@ -208,7 +208,7 @@ class TestRecordStorage {
   }
 
   /// 添加测试记录
-  static Future<void> addRecord(TestRecord record) async {
+  static Future<void> addRecord(QuizRecord record) async {
     final records = await loadRecords();
     records.insert(0, record); // 插入到列表开头
     await saveRecords(records);

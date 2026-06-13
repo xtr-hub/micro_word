@@ -5,13 +5,13 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 
 /// 跨平台存储服务
-import '../services/platform_storage.dart';
+import 'platform_storage.dart';
 
 /// 数据管理服务
-import '../services/data_manager.dart';
+import 'data_manager.dart';
 
 /// WordList模型类，定义了单词表的数据结构
-import 'word_list.dart';
+import '../models/word_list.dart';
 
 /// 单词表存储服务类
 ///

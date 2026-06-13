@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/study_progress.dart';
 import '../models/word.dart';
-import '../models/word_storage.dart';
+import '../services/word_storage.dart';
 import './data_manager.dart';
 
 class ProgressPersistenceService {
