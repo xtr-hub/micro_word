@@ -7,6 +7,8 @@
 [![Provider](https://img.shields.io/badge/State-Provider-green?style=flat-square)](https://pub.dev/packages/provider)
 [![SQLite](https://img.shields.io/badge/Storage-Sqflite-orange?style=flat-square)](https://pub.dev/packages/sqflite)
 [![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-purple?style=flat-square)](#快速开始)
+[![Contributing](https://img.shields.io/badge/Contributing-%E8%B4%A1%E7%8C%AE%E6%8C%87%E5%8D%97-blueviolet?style=flat-square)](CONTRIBUTING.md)
+[![License](https://img.shields.io/badge/License-Mulan%20PSL%20v2-red?style=flat-square)](#许可证)
 
 ## 核心功能
 
