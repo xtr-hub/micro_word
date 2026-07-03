@@ -1,14 +1,18 @@
-# 微单词英语学习应用
+<div align="center">
+  <img src="assets/images/app_icon.svg" alt="logo" width="200" height="200">
 
-微单词是一款基于 Flutter 的跨平台英语单词学习应用，提供单词学习、复习测试、单词本管理、学习进度统计和本地数据持久化能力，适合日常背词、阶段复习和自定义词库管理。
+  # 微单词
 
-[![Flutter](https://img.shields.io/badge/Flutter-%E8%B7%A8%E5%B9%B3%E5%8F%B0-blue?style=flat-square)](https://flutter.dev/)
-[![Dart](https://img.shields.io/badge/Dart-3.x-blue?style=flat-square)](https://dart.dev/)
-[![Provider](https://img.shields.io/badge/State-Provider-green?style=flat-square)](https://pub.dev/packages/provider)
-[![SQLite](https://img.shields.io/badge/Storage-Sqflite-orange?style=flat-square)](https://pub.dev/packages/sqflite)
-[![Platforms](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-purple?style=flat-square)](#快速开始)
+  跨平台英语单词学习应用，让背词更高效、更有趣
 
-## 核心功能
+  <div style="display: flex; justify-content: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-Mulan%20PSL%20v2-blue.svg?style=flat&logo=github" alt="License"></a>
+    <a href="#平台支持"><img src="https://img.shields.io/badge/platform-Android%20%7C%20iOS%20%7C%20Web%20%7C%20Desktop-lightgrey.svg?style=flat" alt="Platform"></a>
+    <a href="https://flutter.dev/"><img src="https://img.shields.io/badge/Flutter-%E8%B7%A8%E5%B9%B3%E5%8F%B0-blue?style=flat" alt="Flutter"></a>
+  </div>
+</div>
+
+## 能干什么
 
 - **单词学习**：支持单词释义、音标、例句和掌握状态记录
 - **发音辅助**：集成文本转语音能力，帮助用户练习听读
@@ -20,28 +24,26 @@
 - **主题设置**：支持浅色、深色和跟随系统主题
 - **跨平台运行**：支持 Android、iOS、Web、Windows、macOS 和 Linux
 
-## 技术栈
-
-| 技术 | 用途 |
-| --- | --- |
-| Flutter | 跨平台应用框架 |
-| Dart | 开发语言 |
-| Provider | 全局状态管理 |
-| sqflite / sqflite_common_ffi | 本地数据库与桌面测试支持 |
-| shared_preferences | 轻量级本地设置存储 |
-| flutter_tts | 单词发音 |
-| fl_chart | 学习统计图表 |
-| file_picker | 数据导入导出文件选择 |
-| flutter_test / integration_test | Widget 测试和集成测试 |
-
 ## 快速开始
+
+### 环境要求
+
+- **Flutter 3.x**
+- **Dart 3.x**
+- 平台工具：
+  - Android: Android Studio / Android SDK
+  - iOS: Xcode (macOS only)
+  - Web: Chrome
+  - Desktop: 对应平台编译器
+
+### 运行项目
 
 ```bash
 flutter pub get
 flutter run
 ```
 
-常用运行方式：
+### 常用运行方式
 
 ```bash
 # Web
@@ -61,6 +63,8 @@ flutter run -d linux
 ```
 
 > Windows 环境运行包含插件的测试或构建时，如遇 symlink 检查，请开启 Developer Mode。
+
+---
 
 ## 项目结构
 
@@ -116,6 +120,37 @@ weidanci/
 └── analysis_options.yaml                 # Dart/Flutter 静态检查配置
 ```
 
+---
+
+## 技术栈
+
+| 技术 | 用途 |
+| --- | --- |
+| Flutter | 跨平台应用框架 |
+| Dart | 开发语言 |
+| Provider | 全局状态管理 |
+| sqflite / sqflite_common_ffi | 本地数据库与桌面测试支持 |
+| shared_preferences | 轻量级本地设置存储 |
+| flutter_tts | 单词发音 |
+| fl_chart | 学习统计图表 |
+| file_picker | 数据导入导出文件选择 |
+| flutter_test / integration_test | Widget 测试和集成测试 |
+
+---
+
+## 平台支持
+
+| 平台 | 学习 | 测验 | 说明 |
+|------|------|------|------|
+| Android | ✅ | ✅ | 完整支持 |
+| iOS | ✅ | ✅ | 完整支持 |
+| Web | ✅ | ✅ | 完整支持 |
+| Windows | ✅ | ✅ | 完整支持 |
+| macOS | ✅ | ✅ | 完整支持 |
+| Linux | ✅ | ✅ | 完整支持 |
+
+---
+
 ## 使用说明
 
 ### 学习单词
@@ -150,6 +185,8 @@ weidanci/
 - 学习时长
 - 签到记录
 
+---
+
 ## 开发与测试
 
 ```bash
@@ -172,6 +209,8 @@ flutter test integration_test/app_smoke_test.dart
 flutter build apk --debug
 ```
 
+---
+
 ## 数据存储
 
 项目的数据层集中在 `lib/services/`：
@@ -183,6 +222,8 @@ flutter build apk --debug
 - `data_consistency_service.dart` 负责启动时的数据校验和修复
 - `platform_storage.dart` 提供跨平台存储能力
 
+---
+
 ## 维护说明
 
 - 日志和临时 diff 文件已加入 `.gitignore`，避免再次污染仓库
@@ -190,6 +231,18 @@ flutter build apk --debug
 - Android 在 Windows 环境下已关闭 Kotlin 增量编译，以规避跨盘缓存路径问题
 - 如需在全新环境中直接使用 Gradle wrapper，请确认 `android/gradlew`、`android/gradlew.bat` 和 `android/gradle/wrapper/gradle-wrapper.jar` 已按团队规范管理
 
+---
+
 ## 许可证
 
 本项目采用木兰宽松许可证，第 2 版（Mulan PSL v2）。
+
+---
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+---
+
+Made with ❤️ for English learners
